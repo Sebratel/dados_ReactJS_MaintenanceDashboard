@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node scripts/db/q.mjs \"select column_name from information_schema.columns where table_schema='erp' and table_name='authentication_contracts' and \\(column_name ilike '%slot%' or column_name ilike '%port%' or column_name ilike '%cto%' or column_name ilike '%splitter%' or column_name ilike '%access%' or column_name ilike '%tag%' or column_name ilike '%site%' or column_name ilike '%contract%'\\) order by column_name\")",
+      "Bash(node scripts/db/q.mjs \"select table_name, column_name from information_schema.columns where table_schema='erp' and table_name in \\('authentication_access_points','authentication_splitters','authentication_splitter_ports'\\) and \\(column_name in \\('id','title','name','description','code'\\) or column_name ilike '%splitter%' or column_name ilike '%access_point%'\\) order by table_name, ordinal_position\")",
+      "Bash(node scripts/db/q.mjs \"select column_name from information_schema.columns where table_schema='erp' and table_name='contract_service_tags' and \\(column_name in \\('id','service_tag','contract_id'\\) or column_name ilike '%splitter%' or column_name ilike '%cto%' or column_name ilike '%box%'\\) order by ordinal_position\")",
+      "Bash(node scripts/db/q.mjs \"select column_name from information_schema.columns where table_schema='erp' and table_name='authentication_contracts' order by ordinal_position\")",
+      "Bash(node scripts/db/q.mjs \"select ordinal_position, column_name from information_schema.columns where table_schema='erp' and table_name='authentication_contracts' and ordinal_position>80 order by ordinal_position\")",
+      "Bash(node scripts/db/q.mjs \"select ordinal_position, column_name, data_type from information_schema.columns where table_schema='erp' and table_name='authentication_splitter_ports' order by ordinal_position\")",
+      "Bash(node scripts/db/q.mjs \"select column_name from information_schema.columns where table_schema='erp' and table_name='assignment_incidents' order by ordinal_position\")",
+      "Bash(node scripts/db/q.mjs ' *)",
+      "Bash(node scripts/db/q.mjs \"select ordinal_position, column_name, data_type from information_schema.columns where table_schema='erp' and table_name='authentication_access_points' order by ordinal_position\")",
+      "Bash(node scripts/db/q.mjs \"select title, slots_first_number, ports_first_number from erp.authentication_access_points where title in \\('OLT 02 - CHNVA','OLT 01 - CHNVA','OLT 03 - CHNVC','OLT 02 - CANMV','OLT 04 - CANNT','OLT 02 - EIOLB','OLT 02 - SPSPI','OLT 01 - SPSCE','OLT 02 - SLECP'\\) order by title\")",
+      "Bash(node scripts/db/q.mjs --arquivo \"C:/Users/FABRIC~1.MAC/AppData/Local/Temp/claude/c--Users-fabricio-machado-Desktop-dashboard-manutencao-ia/105343f9-a06f-4728-bb43-51ee6d11f0ec/scratchpad/proto.sql\")",
+      "Bash(sed 's/ LIMIT 100$//' \"C:/Users/FABRIC~1.MAC/AppData/Local/Temp/claude/c--Users-fabricio-machado-Desktop-dashboard-manutencao-ia/105343f9-a06f-4728-bb43-51ee6d11f0ec/scratchpad/proto.sql\")",
+      "Bash(node scripts/db/q.mjs --arquivo \"C:/Users/FABRIC~1.MAC/AppData/Local/Temp/claude/c--Users-fabricio-machado-Desktop-dashboard-manutencao-ia/105343f9-a06f-4728-bb43-51ee6d11f0ec/scratchpad/proto_full.sql\")",
+      "Bash(node scripts/db/q.mjs --arquivo \"C:/Users/FABRIC~1.MAC/AppData/Local/Temp/claude/c--Users-fabricio-machado-Desktop-dashboard-manutencao-ia/105343f9-a06f-4728-bb43-51ee6d11f0ec/scratchpad/protoB.sql\")",
+      "Bash(python -)",
+      "Bash(node scripts/db/q.mjs --arquivo \"C:/Users/FABRIC~1.MAC/AppData/Local/Temp/claude/c--Users-fabricio-machado-Desktop-dashboard-manutencao-ia/105343f9-a06f-4728-bb43-51ee6d11f0ec/scratchpad/protoC.sql\")",
+      "Bash(node scripts/db/q.mjs --arquivo \"C:/Users/FABRIC~1.MAC/AppData/Local/Temp/claude/c--Users-fabricio-machado-Desktop-dashboard-manutencao-ia/105343f9-a06f-4728-bb43-51ee6d11f0ec/scratchpad/protoD.sql\")",
+      "Bash(node scripts/db/q.mjs --arquivo \"C:/Users/FABRIC~1.MAC/AppData/Local/Temp/claude/c--Users-fabricio-machado-Desktop-dashboard-manutencao-ia/105343f9-a06f-4728-bb43-51ee6d11f0ec/scratchpad/protoE.sql\")",
+      "Bash(npx tsc *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(node -e ' *)",
+      "Bash(npm run *)"
+    ]
+  }
+}

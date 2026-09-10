@@ -1,0 +1,169 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname, useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { BotaoAtualizar } from './BotaoAtualizar'
+
+const NAV = [
+  { href: '/', label: 'Executivo' },
+  { href: '/operacao', label: 'Operação' },
+  { href: '/tempos', label: 'Tempos' },
+  { href: '/produtividade', label: 'Produtividade' },
+  { href: '/recorrencia', label: 'Recorrência' },
+  { href: '/preventivos', label: 'Preventivos' },
+  { href: '/ofensores', label: 'Ofensores' },
+  { href: '/protocolos', label: 'Protocolos' },
+] as const
+
+/**
+ * Cortes que existem em UMA tela so.
+ *
+ * `reincidencia` e `retorno` sao botoes da tela de Protocolos: em qualquer outra
+ * pagina eles nao recortam nada. Sem esta limpeza eles VIAJAM na URL, invisiveis
+ * -- a barra de filtros nao os mostra fora dali -- e quem compartilha o endereco
+ * de Ofensores achando que compartilha um recorte entrega ao destinatario uma
+ * tela de Protocolos ja filtrada, sem nada dizendo isso.
+ *
+ * Nao afeta numero nenhum: conferido que as duas telas ignoram os dois
+ * parametros. E questao de o endereco dizer a verdade sobre o que esta na tela.
+ */
+const CORTES_DA_TELA: Record<string, string> = {
+  reincidencia: '/protocolos',
+  retorno: '/protocolos',
+}
+
+/** A query que sobrevive ao ir para `destino`. */
+function queryPara(destino: string, sp: URLSearchParams): string {
+  const q = new URLSearchParams(sp)
+  for (const [corte, tela] of Object.entries(CORTES_DA_TELA)) {
+    if (destino !== tela) q.delete(corte)
+  }
+  return q.toString()
+}
+
+export function Cabecalho() {
+  const pathname = usePathname()
+  const sp = useSearchParams()
+
+  return (
+    <header
+      className="border-b"
+      style={{ borderColor: 'var(--border)', background: 'var(--surface-1)' }}
+    >
+      <div className="flex items-center gap-4 px-4 py-2.5">
+        {/* marca — vermelho Sebratel vive AQUI, no chrome, nunca como série */}
+        <Link
+          href={`/${queryPara('/', sp) ? `?${queryPara('/', sp)}` : ''}`}
+          className="flex shrink-0 items-center gap-2"
+        >
+          {/*
+            O ARQUIVO OFICIAL, não um desenho meu. A primeira versão redesenhava
+            a esfera em SVG para acompanhar o tema — ficou parecida e errada: a
+            marca da Sebratel tem a malha de losangos, não meridianas, e marca
+            não é lugar para aproximação. É o MESMO arquivo do Data Hub
+            (`logo-circular-sebratel.png`), então os dois sistemas internos
+            mostram exatamente o mesmo símbolo.
+
+            O PNG é RGBA: os vazados da malha são transparentes, então ele se
+            apoia no fundo dos dois temas sem precisar de variante.
+          */}
+          <img
+            src="/logo-sebratel.png"
+            alt=""
+            width={28}
+            height={28}
+            className="size-7 shrink-0"
+          />
+          <span className="flex flex-col leading-none">
+            {/* nowrap: sem isto o título quebra em "Manutenção / FTTX" quando a
+                janela aperta, e a marca fica com o dobro da altura do resto do
+                cabeçalho — some o alinhamento de tudo que está ao lado. */}
+            <span className="text-[13px] font-semibold whitespace-nowrap text-[var(--text-primary)]">
+              Manutenção FTTX
+            </span>
+            {/* "SEBRATEL" em vermelho e caixa alta espaçada: é o wordmark da
+                empresa, não um subtítulo — por isso não usa a cor de texto
+                secundário como o resto do chrome. O tracking é o mesmo do Data
+                Hub (0.14em), para as duas marcas lerem como a mesma família. */}
+            <span
+              className="mt-0.5 text-[9px] font-bold tracking-[0.14em]"
+              style={{ color: 'var(--brand)' }}
+            >
+              SEBRATEL
+            </span>
+          </span>
+        </Link>
+
+        <nav className="flex items-center gap-0.5" aria-label="Seções">
+          {NAV.map((n) => {
+            const ativo = pathname === n.href
+            const q = queryPara(n.href, sp)
+            return (
+              <Link
+                key={n.href}
+                href={q ? `${n.href}?${q}` : n.href}
+                aria-current={ativo ? 'page' : undefined}
+                className="relative rounded px-2.5 py-1.5 text-xs font-medium transition-colors"
+                style={{
+                  color: ativo ? 'var(--text-primary)' : 'var(--text-muted)',
+                  background: ativo ? 'var(--surface-page)' : 'transparent',
+                }}
+              >
+                {n.label}
+                {ativo && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-x-2.5 -bottom-[9px] h-0.5 rounded-full"
+                    style={{ background: 'var(--brand)' }}
+                  />
+                )}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="ml-auto flex items-center gap-3">
+          <BotaoAtualizar />
+          <AlternadorTema />
+        </div>
+      </div>
+    </header>
+  )
+}
+
+function AlternadorTema() {
+  const [tema, setTema] = useState<'claro' | 'escuro' | null>(null)
+
+  useEffect(() => {
+    const salvo = localStorage.getItem('tema')
+    if (salvo === 'claro' || salvo === 'escuro') {
+      setTema(salvo)
+      document.documentElement.dataset.theme = salvo === 'escuro' ? 'dark' : 'light'
+    } else {
+      setTema(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'escuro' : 'claro')
+    }
+  }, [])
+
+  if (tema === null) return <div className="size-7" />
+
+  const alternar = () => {
+    const novo = tema === 'claro' ? 'escuro' : 'claro'
+    setTema(novo)
+    localStorage.setItem('tema', novo)
+    document.documentElement.dataset.theme = novo === 'escuro' ? 'dark' : 'light'
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={alternar}
+      title={`Mudar para tema ${tema === 'claro' ? 'escuro' : 'claro'}`}
+      className="grid size-7 place-items-center rounded border text-xs transition-colors hover:border-[var(--border-strong)]"
+      style={{ borderColor: 'var(--border)' }}
+    >
+      <span aria-hidden="true">{tema === 'claro' ? '🌙' : '☀'}</span>
+      <span className="sr-only">Alternar tema</span>
+    </button>
+  )
+}

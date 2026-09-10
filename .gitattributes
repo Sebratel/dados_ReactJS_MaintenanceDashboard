@@ -1,0 +1,14 @@
+# Desliga a conversao de fim de linha. NAO e desleixo, e uma decisao.
+#
+# O PROBLEMA QUE ISTO RESOLVE: com a conversao ligada, o git avisa
+# "LF will be replaced by CRLF" em dezenas de arquivos a cada backup. O aviso e
+# inofensivo, mas pinta a tela de amarelo e treina a pessoa a ignorar a saida do
+# backup — inclusive a linha que diz que o envio FALHOU.
+#
+# POR QUE PODE SER DESLIGADO AQUI: normalizar fim de linha serve para times em
+# sistemas diferentes. Este projeto roda em uma estacao Windows, com um usuario.
+# Nao ha o problema que a normalizacao existe para resolver, so o custo dela.
+#
+# Se um dia isto virar repositorio compartilhado com Linux/CI, troque por
+# "* text=auto" e faca UM commit de normalizacao.
+* -text

@@ -1,0 +1,45 @@
+# ── O que NUNCA deve entrar na imagem ────────────────────────
+# Sem este arquivo o build context sai de ~1 MB de codigo para ~678 MB
+# (node_modules 463 MB + .next 199 MB + CSVs 16 MB). Medido em 10/09/2026.
+
+# Segredos: em producao as credenciais vem do ambiente do runtime,
+# nunca de um .env copiado para dentro da imagem.
+.env
+.env.*
+
+# Dependencias e build — reinstalados/reconstruidos dentro da imagem
+node_modules/
+.next/
+.next-verify/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Dados de auditoria. Sao exports de conferencia contra o Power BI, nao
+# insumo da aplicacao (o dashboard le do ERP ao vivo, nao destes arquivos).
+# Ficam versionados no repo de proposito, mas nao tem por que ir na imagem.
+*.csv
+
+# Logs
+*.log
+
+# Documentacao e ferramental de desenvolvimento
+docs/
+scripts/
+.git/
+.github/
+.claude/
+*.bat
+README.md
+
+# Cache de ferramentas
+.turbo/
+.eslintcache
+coverage/
+.vitest/
+
+# SO / editor
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,58 @@
+# ── Segredos — NUNCA versionar ──────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Dependências e build ────────────────────────────────────
+node_modules/
+.next/
+.next-verify/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# ── Cache de ferramentas ────────────────────────────────────
+.turbo/
+.eslintcache
+coverage/
+.vitest/
+
+# ── Saídas locais de diagnóstico ────────────────────────────
+scripts/db/out_*.txt
+*.local.json
+
+# Log do servidor em segundo plano. Fica de fora porque e volatil e local, mas
+# NAO pode ser apagado a esmo: sem janela visivel, ele e a unica fonte do erro
+# quando o dashboard nao sobe.
+dev-server.log
+dev-server.anterior.log
+
+# ── DADOS PESSOAIS — não versionar no repositório publicado ─
+#
+# Decidido em 10/09/2026, antes do primeiro push para o GitHub.
+#
+# Os CSVs de auditoria são exports de conferência contra o Power BI e contêm
+# dado pessoal em volume: nome de cliente, cidade, login PPPoE e desempenho
+# individual nominal de técnico. Exemplos medidos na época da decisão:
+# `reincidentes-visitas-agosto-2026 v2.csv` (10.547 linhas com nome + PPPoE),
+# `bi_clientes_reparo_*.csv` (2.357 clientes nominais cada),
+# `nosso_protocolo_dia_agosto.csv` (37 técnicos × 3.977 linhas de produtivo/dia).
+#
+# Eles NÃO são insumo da aplicação — o dashboard lê do ERP ao vivo. Servem para
+# auditoria pontual e devem ficar só na máquina de quem audita.
+*.csv
+
+# Mesma razão, em prosa: estes dois documentos citam 79 pessoas nominalmente,
+# várias com número de produtividade individual ao lado. O restante de `docs/`
+# é publicado normalmente.
+#
+# ⚠️ NÃO "conserte" isto re-adicionando os arquivos: a ausência é deliberada.
+# Eles continuam versionados na história local e no remote `onedrive`.
+docs/04-mudancas-de-criterio.md
+docs/06-ajustes-pendentes.md
+
+# ── SO / editor ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini

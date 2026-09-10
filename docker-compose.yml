@@ -1,0 +1,107 @@
+# Stack para Portainer.
+#
+# Um serviço só: o Next serve as páginas e a API na MESMA porta, a 8092. Não há
+# serviço de banco aqui — o ERP Voalle (PostgreSQL), o Data Hub (MariaDB) e o
+# Redis são externos e já existem; este container só os consulta, sempre em
+# leitura.
+#
+# Em Portainer: Stacks -> Add stack -> Repository, apontando para o repositório
+# deste projeto, e preencha as variáveis abaixo em "Environment variables".
+# Nenhum segredo mora neste arquivo, de propósito.
+services:
+  manutencao-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Sem `args` aqui de propósito: diferente do integradoras-dashboard (que
+      # precisa das VITE_* no bundle), este projeto não tem NENHUMA variável
+      # que entre no JavaScript do cliente. Tudo é lido em runtime pelo
+      # servidor, então trocar qualquer variável abaixo exige só recriar o
+      # container — não reconstruir a imagem.
+    image: manutencao-dashboard:1.0.0
+    container_name: manutencao-dashboard
+    restart: unless-stopped
+    ports:
+      # host:container — 8080/8081 são do dashboard comercial e 8091 do
+      # integradoras; 8092 é a porta deste sistema.
+      - "${HOST_PORT:-8092}:8092"
+    environment:
+      TZ: America/Sao_Paulo
+      PORT: 8092
+
+      # ---- ERP Voalle (PostgreSQL, schema `erp`) — SOMENTE LEITURA ----
+      # A conexão é uma réplica read-only de produção com 1.384 tabelas.
+      # Nunca escrever, nunca criar índice, nunca deixar query sem timeout.
+      DB_ELLEVEN_HOST: ${DB_ELLEVEN_HOST}
+      DB_ELLEVEN_DATABASE: ${DB_ELLEVEN_DATABASE}
+      DB_ELLEVEN_USER: ${DB_ELLEVEN_USER}
+      DB_ELLEVEN_PASSWORD: ${DB_ELLEVEN_PASSWORD}
+      DB_ELLEVEN_PORT: ${DB_ELLEVEN_PORT:-5432}
+      ERP_POOL_MAX: ${ERP_POOL_MAX:-6}
+
+      # ---- Data Hub (MariaDB) — base diária de clientes ----
+      # Denominador do Coeficiente de Reparos. Host em IP privado: o container
+      # precisa enxergar a rede corporativa.
+      MARIA_HOST: ${MARIA_HOST}
+      MARIA_DATABASE: ${MARIA_DATABASE:-DB_Applicattion}
+      MARIA_USER: ${MARIA_USER}
+      MARIA_PASSWORD: ${MARIA_PASSWORD}
+      MARIA_PORT: ${MARIA_PORT:-3306}
+      MARIA_POOL_MAX: ${MARIA_POOL_MAX:-5}
+
+      # ---- Redis (cache L2) — OPCIONAL ----
+      # Sem REDIS_HOST o dashboard funciona igual; o Redis só faz o cache
+      # sobreviver ao redeploy.
+      # ⚠️ COMPARTILHADO com as outras aplicações do servidor: o prefixo é
+      # obrigatório, toda chave tem TTL, e só entra payload até REDIS_MAX_KB
+      # para não disputar memória com elas.
+      REDIS_HOST: ${REDIS_HOST:-}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_USER: ${REDIS_USER:-}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_PREFIXO: ${REDIS_PREFIXO:-dash:manutencao:}
+      REDIS_MAX_KB: ${REDIS_MAX_KB:-512}
+
+      # ---- acesso ao dashboard ----
+      # Sem estas duas o dashboard responde 503 e NÃO abre. É falha fechada de
+      # propósito: sem barreira, qualquer um na rede vê nome de cliente,
+      # endereço e produtividade individual de técnico.
+      DASH_USUARIO: ${DASH_USUARIO}
+      DASH_SENHA: ${DASH_SENHA}
+
+      # ---- limites de memória do cache ----
+      # Teto do cache L1 em MB. Precisa caber com folga dentro do
+      # --max-old-space-size abaixo: uma entrada de "Ano corrente" de
+      # /protocolos mede ~14 MB (medido em 10/09/2026).
+      CACHE_MAX_MB: ${CACHE_MAX_MB:-256}
+
+      NODE_OPTIONS: --max-old-space-size=1024
+    healthcheck:
+      # /api/health não passa pela autenticação de propósito — o wget não manda
+      # credencial. A rota não devolve dado de negócio nenhum.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8092/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    logging:
+      # Sem isto o log cresce até encher o disco do host. O app escreve em
+      # stdout (nunca em arquivo dentro do container), então a rotação aqui é
+      # o único controle que existe.
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          # 1,5 GB dá folga sobre o heap de 1 GB. Se algo vazar, o container
+          # reinicia e o problema aparece — melhor que o host começar a fazer
+          # swap e tudo ficar lento sem causa aparente.
+          memory: 1.5g
+
+# Sem `volumes:` de propósito. Diferente do integradoras-dashboard, este app não
+# guarda estado em disco: não há papéis/permissões por tela (a barreira é Basic
+# auth por variável de ambiente) e o cache é memória + Redis. O container é
+# descartável — recriar não perde configuração de ninguém.

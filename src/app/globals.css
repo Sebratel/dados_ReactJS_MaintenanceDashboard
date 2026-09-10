@@ -1,0 +1,192 @@
+@import 'tailwindcss';
+
+/* ════════════════════════════════════════════════════════════════════
+   DESIGN TOKENS — Dashboard Manutenção FTTX / Sebratel
+   Paleta validada com scripts/validate_palette.js (dataviz):
+     categórica 7 slots  → light e dark: TODOS OS CHECKS PASSAM
+       CVD pior par adjacente  ΔE 9.1 light / 8.4 dark  (alvo ≥ 8)
+       visão normal pior par   ΔE 19.6 light / 19.3 dark (piso ≥ 15)
+     rampa ordinal 30/60/90d → PASS nos dois modos
+   O vermelho da marca (#D80010) fica FORA da rotação de séries: é chrome.
+   Assim nenhuma série se confunde com marca nem com status crítico.
+   ════════════════════════════════════════════════════════════════════ */
+
+:root {
+  color-scheme: light;
+
+  /* superfícies e tinta */
+  --surface-1: #fcfcfb; /* superfície do gráfico/card */
+  --surface-page: #f9f9f7; /* plano da página */
+  --surface-raised: #ffffff;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --gridline: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --border-strong: rgba(11, 11, 11, 0.18);
+
+  /* marca — SOMENTE chrome (branco sobre ela = 5,35:1; sobre superfície = 5,21:1) */
+  --brand: #d80010;
+  --brand-ink: #ffffff;
+  --brand-deep: #c00810;
+
+  /* categórica: 7 slots, ordem fixa, NUNCA ciclada */
+  --series-1: #2a78d6; /* azul */
+  --series-2: #eb6834; /* laranja */
+  --series-3: #1baf7a; /* aqua */
+  --series-4: #eda100; /* amarelo */
+  --series-5: #e87ba4; /* magenta */
+  --series-6: #008300; /* verde */
+  --series-7: #4a3aa7; /* violeta */
+
+  /* status — reservado, sempre com ícone + rótulo, nunca como série */
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+  --delta-up-good: #006300;
+
+  /* sequencial (magnitude) — um hue, 100→700 */
+  --seq-100: #cde2fb;
+  --seq-200: #9ec5f4;
+  --seq-300: #6da7ec;
+  --seq-400: #3987e5;
+  --seq-500: #256abf;
+  --seq-600: #184f95;
+  --seq-700: #0d366b;
+
+  /* ordinal 30/60/90 dias (janelas ordenadas → rampa de um hue) */
+  --ord-1: #86b6ef;
+  --ord-2: #2a78d6;
+  --ord-3: #184f95;
+
+  /* divergente (polaridade vs meta) — azul ↔ vermelho, cinza no meio */
+  --div-neg: #2a78d6;
+  --div-mid: #f0efec;
+  --div-pos: #d03b3b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --surface-page: #0d0d0d;
+    --surface-raised: #222221;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --gridline: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --border-strong: rgba(255, 255, 255, 0.18);
+
+    --brand: #e84a52; /* clareado para 4,59:1 na superfície escura */
+    --brand-ink: #ffffff;
+    --brand-deep: #d80010;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+
+    --delta-up-good: #0ca30c;
+
+    --ord-1: #cde2fb;
+    --ord-2: #3987e5;
+    --ord-3: #184f95;
+
+    --div-mid: #383835;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --surface-1: #1a1a19;
+  --surface-page: #0d0d0d;
+  --surface-raised: #222221;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --gridline: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
+
+  --brand: #e84a52;
+  --brand-ink: #ffffff;
+  --brand-deep: #d80010;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+
+  --delta-up-good: #0ca30c;
+
+  --ord-1: #cde2fb;
+  --ord-2: #3987e5;
+  --ord-3: #184f95;
+
+  --div-mid: #383835;
+}
+
+/* expõe os tokens ao Tailwind v4 */
+@theme inline {
+  --color-surface-1: var(--surface-1);
+  --color-surface-page: var(--surface-page);
+  --color-surface-raised: var(--surface-raised);
+  --color-ink: var(--text-primary);
+  --color-ink-secondary: var(--text-secondary);
+  --color-ink-muted: var(--text-muted);
+  --color-gridline: var(--gridline);
+  --color-axis: var(--axis);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-deep: var(--brand-deep);
+  --color-good: var(--status-good);
+  --color-warning: var(--status-warning);
+  --color-serious: var(--status-serious);
+  --color-critical: var(--status-critical);
+  --font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+html,
+body {
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* o body nunca rola na horizontal — conteúdo largo rola no próprio container */
+body {
+  overflow-x: hidden;
+}
+
+/* números em coluna precisam alinhar; números soltos não */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--brand) 25%, transparent);
+}
+
+*:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* scrollbar discreta */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--axis) transparent;
+}
