@@ -249,8 +249,25 @@ export const TIPOS_FORA_DA_MANUTENCAO = [
  * docs/06 item M: MARCOS VINICIUS DE OLIVEIRA BARBOSA responde por 717
  * protocolos da Equipe Field Service e entraria na lista por ter respondido a UM
  * do COR. Mesmo problema de vigência do item 18.
+ *
+ * ── 1084 · Equipe CAOC, acrescentada em 11/09/2026 ────────────────────────
+ *
+ * Mesma natureza das outras: é central, não campo. Entrou pelo caminho já
+ * conhecido — catálogo `Oper. Reparo`/`Equipe reparo` sem ser time de campo.
+ *
+ * Universo dela em 2026 (medido em 11/09/2026): **14 protocolos**, e a forma
+ * importa mais que o número —
+ *
+ *   13 são `Cancelado` (lote criado em 18–19/03 e cancelado em 24/03, todos
+ *      `TEC - Suporte técnico`), então JÁ saíam do universo por padrão;
+ *    1 é o **1580311**, `Encerrado`, `INCIDENTE/PROBLEMA`, aberto em 18/03 e
+ *      encerrado só em 08/09 — **4.168 h**, com o relato literal
+ *      *"DESCONSIDERAR"* e sem nenhuma linha de roteirização.
+ *
+ * Esse único protocolo sozinho levava o MTTR de setembro/2026 de 20:24 para
+ * 23:18 na visão padrão. Ver docs/06 item W.
  */
-export const EQUIPES_FORA_DA_MANUTENCAO = [1007, 1074, 1025, 67, 1117] as const
+export const EQUIPES_FORA_DA_MANUTENCAO = [1007, 1074, 1025, 67, 1117, 1084] as const
 
 /**
  * Marca da TRILHA da base no field service (`region_title` da view de slots).
