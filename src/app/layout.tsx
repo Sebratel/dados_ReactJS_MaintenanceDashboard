@@ -1,9 +1,8 @@
 import type { Metadata } from 'next'
-import { Suspense } from 'react'
 import './globals.css'
 import { Provedores } from '@/components/Provedores'
-import { Cabecalho } from '@/components/Cabecalho'
-import { BarraFiltros } from '@/components/filtros/BarraFiltros'
+import { SessaoFirebase } from '@/components/SessaoFirebase'
+import { obterConfigFirebase } from '@/server/auth/configCliente'
 
 export const metadata: Metadata = {
   title: 'Manutenção FTTX · Sebratel',
@@ -34,13 +33,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <Provedores>
-          <Suspense fallback={<div className="h-[45px]" />}>
-            <Cabecalho />
-          </Suspense>
-          <Suspense fallback={<div className="h-[49px]" />}>
-            <BarraFiltros />
-          </Suspense>
-          <main className="px-4 py-4">{children}</main>
+          {/*
+            Envolve TUDO, login inclusive: é quem mantém o cookie de sessão em
+            dia com o token do Firebase enquanto a aba fica aberta. A moldura do
+            dashboard (cabeçalho e filtros) não está mais aqui — ela vive no
+            layout do grupo `(dashboard)`, para a tela de login não herdá-la.
+          */}
+          <SessaoFirebase config={obterConfigFirebase()}>{children}</SessaoFirebase>
         </Provedores>
       </body>
     </html>

@@ -76,8 +76,9 @@ COPY --from=build --chown=app:app /app/public ./public
 RUN rm -f /app/.env /app/.env.*
 
 # Sem volume de estado: diferente do integradoras-dashboard, este app não grava
-# nada em disco. Papéis/permissões não existem aqui (a barreira é Basic auth por
-# variável de ambiente) e o cache é memória + Redis. Container descartável.
+# nada em disco. Papéis/permissões não existem aqui (entra qualquer conta do
+# domínio autorizado, e a lista de contas vive no Firebase) e o cache é memória
+# + Redis. Container descartável.
 USER app
 EXPOSE 8092
 

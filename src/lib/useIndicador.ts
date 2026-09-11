@@ -1,6 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import { buscarJson } from './clienteHttp'
 import { filtrosParaQuery, type Filtros } from './filtros'
 import type { Kpis } from '@/server/indicadores/kpis'
 import type { Mtta } from '@/server/indicadores/mtta'
@@ -39,15 +40,13 @@ async function buscar<T, M = Record<string, unknown>>(
 ): Promise<Envelope<T, M>> {
   const forcar = Date.now() < forcarAte
   const qs = `${filtrosParaQuery(filtros)}${forcar ? '&atualizar=1' : ''}`
-  const r = await fetch(`/api/indicadores/${slug}?${qs}`, {
+  // `buscarJson` e não `fetch`: é ele que distingue sessão expirada de erro de
+  // dados. Um `fetch` cru aqui tomaria 401 e a tela mostraria "falha ao
+  // carregar" para sempre, sem nunca mandar ninguém para o login.
+  return buscarJson<Envelope<T, M>>(`/api/indicadores/${slug}?${qs}`, {
     headers: { accept: 'application/json' },
     ...(forcar ? { cache: 'no-store' as const } : {}),
   })
-  if (!r.ok) {
-    const corpo = (await r.json().catch(() => null)) as { erro?: string; detalhe?: string } | null
-    throw new Error(corpo?.erro ?? `falha ao carregar ${slug} (HTTP ${r.status})`)
-  }
-  return r.json() as Promise<Envelope<T, M>>
 }
 
 /** Chave de cache: só os campos que o indicador realmente usa. */
@@ -253,15 +252,13 @@ export function useProtocolos(
       q.set('porPagina', String(opts.porPagina))
       if (opts.busca) q.set('busca', opts.busca)
       if (forcar) q.set('atualizar', '1')
-      const r = await fetch(`/api/protocolos?${q.toString()}`, {
-        headers: { accept: 'application/json' },
-        ...(forcar ? { cache: 'no-store' as const } : {}),
-      })
-      if (!r.ok) {
-        const corpo = (await r.json().catch(() => null)) as { erro?: string } | null
-        throw new Error(corpo?.erro ?? `falha ao carregar protocolos (HTTP ${r.status})`)
-      }
-      return r.json() as Promise<{ data: LinhaProtocolo[]; meta: MetaProtocolos }>
+      return buscarJson<{ data: LinhaProtocolo[]; meta: MetaProtocolos }>(
+        `/api/protocolos?${q.toString()}`,
+        {
+          headers: { accept: 'application/json' },
+          ...(forcar ? { cache: 'no-store' as const } : {}),
+        }
+      )
     },
     refetchInterval: 1_800_000,
     staleTime: 300_000,

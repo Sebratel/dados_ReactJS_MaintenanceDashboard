@@ -13,11 +13,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      # Sem `args` aqui de propósito: diferente do integradoras-dashboard (que
-      # precisa das VITE_* no bundle), este projeto não tem NENHUMA variável
-      # que entre no JavaScript do cliente. Tudo é lido em runtime pelo
-      # servidor, então trocar qualquer variável abaixo exige só recriar o
-      # container — não reconstruir a imagem.
+      # Sem `args` aqui de propósito, e isso CONTINUA valendo depois do SSO.
+      #
+      # Diferente do integradoras-dashboard (que precisa das VITE_* dentro do
+      # bundle), aqui nem a configuração do Firebase é gravada em tempo de
+      # build: ela desce como prop da tela de login, lida do ambiente pelo
+      # servidor. Se fossem `NEXT_PUBLIC_*`, trocar o projeto Firebase exigiria
+      # RECONSTRUIR A IMAGEM, e a pegadinha clássica seria mudar a variável no
+      # Portainer, reiniciar, e o bundle antigo continuar apontando para o
+      # projeto velho — sem nada na tela dizendo isso.
+      #
+      # Trocar qualquer variável abaixo exige só recriar o container.
     image: manutencao-dashboard:1.0.0
     container_name: manutencao-dashboard
     restart: unless-stopped
@@ -63,12 +69,23 @@ services:
       REDIS_PREFIXO: ${REDIS_PREFIXO:-dash:manutencao:}
       REDIS_MAX_KB: ${REDIS_MAX_KB:-512}
 
-      # ---- acesso ao dashboard ----
-      # Sem estas duas o dashboard responde 503 e NÃO abre. É falha fechada de
-      # propósito: sem barreira, qualquer um na rede vê nome de cliente,
-      # endereço e produtividade individual de técnico.
-      DASH_USUARIO: ${DASH_USUARIO}
-      DASH_SENHA: ${DASH_SENHA}
+      # ---- acesso ao dashboard: SSO com conta Google (Firebase) ----
+      # Sem FIREBASE_PROJECT_ID e ALLOWED_DOMAIN o dashboard responde 503 e NÃO
+      # abre. É falha fechada de propósito: sem barreira, qualquer um na rede vê
+      # nome de cliente, endereço e produtividade individual de técnico.
+      #
+      # As quatro FIREBASE_* são lidas em RUNTIME (o servidor passa a
+      # configuração para a tela de login), e não gravadas no bundle — por isso
+      # continuam aqui, em `environment`, e não em `build.args`. Trocar de
+      # projeto Firebase é recriar o container, sem rebuild.
+      FIREBASE_API_KEY: ${FIREBASE_API_KEY}
+      FIREBASE_AUTH_DOMAIN: ${FIREBASE_AUTH_DOMAIN}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
+      FIREBASE_APP_ID: ${FIREBASE_APP_ID}
+
+      # Quem pode entrar. O `hd` mandado ao Google só filtra o seletor de
+      # contas; é esta variável que o servidor confere no token.
+      ALLOWED_DOMAIN: ${ALLOWED_DOMAIN:-sebratel.com.br}
 
       # ---- limites de memória do cache ----
       # Teto do cache L1 em MB. Precisa caber com folga dentro do
@@ -102,6 +119,7 @@ services:
           memory: 1.5g
 
 # Sem `volumes:` de propósito. Diferente do integradoras-dashboard, este app não
-# guarda estado em disco: não há papéis/permissões por tela (a barreira é Basic
-# auth por variável de ambiente) e o cache é memória + Redis. O container é
-# descartável — recriar não perde configuração de ninguém.
+# guarda estado em disco: não há papéis/permissões por tela (quem entra é
+# qualquer conta @sebratel.com.br, e a lista de contas vive no Firebase) e o
+# cache é memória + Redis. O container é descartável — recriar não perde
+# configuração de ninguém.

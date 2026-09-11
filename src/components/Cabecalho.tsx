@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { BotaoAtualizar } from './BotaoAtualizar'
+import { MenuUsuario } from './MenuUsuario'
 
 const NAV = [
   { href: '/', label: 'Executivo' },
@@ -126,6 +127,7 @@ export function Cabecalho() {
         <div className="ml-auto flex items-center gap-3">
           <BotaoAtualizar />
           <AlternadorTema />
+          <MenuUsuario />
         </div>
       </div>
     </header>

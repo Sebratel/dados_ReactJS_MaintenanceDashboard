@@ -60,9 +60,10 @@ O script confere, a cada backup, se o `.env` continua ignorado pelo git, e
 **cancela o envio** se não estiver. Um `.gitignore` editado por engano só
 apareceria nesse momento.
 
-O dashboard pede usuário e senha (`DASH_USUARIO` / `DASH_SENHA` no `.env`).
-Sem essas duas variáveis ele responde 503 e não abre — falha fechada de
-propósito, para que erro de configuração não vire exposição silenciosa.
+O dashboard entra com **conta Google da Sebratel** (ver [Acesso](#acesso)). Sem
+`FIREBASE_PROJECT_ID` e `ALLOWED_DOMAIN` ele responde 503 e não abre — falha
+fechada de propósito, para que erro de configuração não vire exposição
+silenciosa.
 
 ```bash
 npm run verify     # valida o build SEM derrubar o dev server (saída em .next-verify/)
@@ -100,8 +101,15 @@ que escreve em `.next-verify/`. Se acontecer: pare o servidor, `rm -rf .next`,
 
 ```
 src/
-├── app/                    rotas (wrapper server + Conteudo client) e /api/indicadores/[slug]
+├── middleware.ts           o ÚNICO portão: verifica a sessão em toda rota
+├── app/
+│   ├── (dashboard)/        as 8 telas + a moldura (cabeçalho e filtros).
+│   │                       O grupo entre parênteses não aparece na URL; ele
+│   │                       existe para o login NÃO herdar a moldura.
+│   ├── login/              tela de entrada (SSO Google)
+│   └── api/                indicadores/[slug], protocolos, auth/sessao, health
 ├── server/
+│   ├── auth/               verificação do ID token (Web Crypto) e cookie
 │   ├── db/                 pools pg e mysql2, type parsers de timestamp
 │   └── indicadores/        um módulo por indicador; base.ts tem o FROM composável
 ├── config/regras-negocio.ts  equipes, catálogos, categorias preventivas, metas, feriados
@@ -109,8 +117,9 @@ src/
 │   ├── charts/             wrappers ECharts (Chart, SerieTemporal, RankingBarras, Heatmap…)
 │   ├── kpi/StatTile.tsx
 │   ├── filtros/            barra global com estado na URL
+│   ├── SessaoFirebase.tsx  mantém o cookie em dia com o token do Firebase
 │   └── Painel.tsx          card com toggle gráfico ⇄ tabela
-└── lib/                    filtros (Zod), formato pt-BR, tema (tokens → ECharts)
+└── lib/                    filtros (Zod), formato pt-BR, tema, clienteHttp (401)
 ```
 
 ## Páginas
@@ -166,17 +175,79 @@ agregados de `docs/03-plano.md` §2.
 
 ## Acesso
 
-**Trocou a senha? Reinicie o servidor.** O Next recarrega o `.env` para a
-aplicação (escreve `Reload env: .env` no log), mas o middleware vive num bundle
-compilado separado e mantém o valor antigo até o processo reiniciar — a senha nova
-responde 401 e parece erro de digitação.
+**SSO com conta Google, via Firebase Authentication.** Cada pessoa entra com a
+própria conta `@sebratel.com.br`; não há mais senha para combinar nem para
+trocar. O e-mail de cada sessão aberta vai para o log do servidor, então dá para
+saber quem viu — coisa que a credencial compartilhada anterior nunca permitiu.
 
-`src/middleware.ts` protege **tudo**, inclusive `/api/indicadores/*` — trancar a
-página e deixar o endpoint aberto não protegeria nada. Autenticação HTTP Basic com
-credencial compartilhada: barra quem não deve ver, mas **não identifica quem viu**
-e não permite revogar o acesso de uma pessoa sem trocar a senha de todos. Quando
-identidade por pessoa passar a importar, o caminho é Auth.js com Google restrito a
-`@sebratel.com.br` (as credenciais já estão no `.env`, só precisam ser renomeadas).
+`src/middleware.ts` continua protegendo **tudo**, inclusive
+`/api/indicadores/*` — trancar a página e deixar o endpoint aberto não protegeria
+nada. Ele é o **único portão**: espalhar a checagem pelas rotas criaria a chance
+de uma rota nova nascer desprotegida.
+
+### Por que Firebase e não Google Identity Services
+
+O GSI baixa o SDK de `accounts.google.com` **em tempo de execução** e obriga o
+servidor a chamar o Google **a cada login**, porque o `access_token` dele é
+opaco. São duas dependências de rede, e qualquer uma bloqueada pelo firewall
+corporativo derruba o login inteiro — com uma tela de erro que não ajuda, porque
+ela precisa exatamente do domínio bloqueado para aparecer. Foi o que quebrou o
+Data Hub em agosto/2026 enquanto o HUBBI, com Firebase, seguia logando.
+
+Aqui o SDK vem no bundle (npm) e o ID token é um **JWT assinado**, verificado
+localmente em `src/server/auth/firebaseToken.ts` com a chave pública do Google,
+que fica em cache por horas. Depois da primeira busca de chaves, validar sessão
+não toca a rede.
+
+### O que o servidor confere em todo token
+
+`alg = RS256` (recusar o que o token declara abre o `alg: none`), emissor e
+audience **deste** projeto (sem isso, token de qualquer projeto Firebase do mundo
+entra), vencimento, `iat` não absurdamente no futuro, e-mail verificado e
+**domínio do e-mail**. O `hd` que a tela manda ao Google só filtra o seletor de
+contas — **quem controla acesso é `ALLOWED_DOMAIN` no servidor**.
+
+`npm test` cobre isso com 17 casos, incluindo `alg: none`, troca para HS256,
+payload adulterado depois de assinado, token de outro projeto e domínio que
+apenas *termina* parecido com o autorizado.
+
+### Sessão
+
+O cookie `sessao_manutencao` é **HttpOnly** e guarda o próprio ID token, que vale
+1 h. Quem o mantém vivo é o cliente: o SDK renova o token sozinho e
+`SessaoFirebase` reposta o novo. A sessão do Firebase persiste no navegador, então
+quem volta no dia seguinte entra sem ver o popup.
+
+⚠️ **Falha ao renovar NÃO é logout.** Quem encerra a sessão é um **401 que
+persiste depois de uma tentativa de renovação** (`src/lib/clienteHttp.ts`).
+Tratar falha de rede como logout foi o erro que, no Data Hub, jogava a pessoa
+numa tela de login que o mesmo bloqueio impedia de funcionar: sessão válida
+virava beco sem saída.
+
+### Passos manuais no console do Firebase
+
+Projeto próprio deste sistema: `maintenance-dashboard-bbf92`. Nunca reaproveitar
+o projeto de outro setor — base de usuários, domínios autorizados, cotas e log de
+acesso ficam separados.
+
+1. **Authentication → Sign-in method → Google → Ativar.** Projeto novo vem com
+   todos os provedores desligados.
+2. **Authentication → Settings → Authorized domains** → adicionar o domínio onde
+   o dashboard roda. Só `localhost` vem liberado. Sem isso o popup falha com
+   `auth/unauthorized-domain` — e esse erro **só aparece no primeiro clique real,
+   nunca no build**.
+3. **Google Cloud → APIs e serviços → Credenciais** → restringir a `apiKey`:
+   só Identity Toolkit e Token Service, e referenciadores HTTP do domínio do
+   dashboard. Ela ser pública é normal; ela valer para API cobrada não é.
+
+### Limite conhecido
+
+O cache das chaves do Google vive **em memória**, não em disco: o middleware roda
+no runtime Edge, que não tem sistema de arquivos. Uma renovação que falha não
+invalida o que já está em cache, e o cache vale 30 dias — mas um **restart do
+container durante um bloqueio de saída para o Google** deixa o servidor sem
+chaves para validar sessão existente. (Login novo não seria possível de todo
+jeito nesse cenário: o navegador também não alcançaria o Google.)
 
 ## Decisões que não devem ser revertidas sem ler o porquê
 
