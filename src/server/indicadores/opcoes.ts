@@ -5,7 +5,7 @@ import {
   TRILHA_MANUTENCAO,
 } from '@/config/regras-negocio'
 import type { Filtros } from '@/lib/filtros'
-import { montarFrom, montarWhere } from './base'
+import { montarFrom, montarWhere, porAbertura, porEncerramento } from './base'
 
 export type OpcoesFiltro = {
   base: string[]
@@ -32,26 +32,58 @@ export type OpcoesFiltro = {
  */
 export async function obterOpcoesFiltro(f: Filtros): Promise<{ data: OpcoesFiltro; ms: number }> {
   const FROM = montarFrom({ categorias: true })
-  const w = montarWhere(
-    {
-      ...f,
-      cidade: undefined,
-      equipe: undefined,
-      catalogo: undefined,
-      tipo: undefined,
-      status: undefined,
-      categoria2: undefined,
-      tecnico: undefined,
-      base: undefined,
-    },
-    // sem isto, 'Cancelado' nunca apareceria no combo de status — a exclusão
-    // padrão do universo o esconderia, e a pessoa não teria como pedir a única
-    // visão em que ele aparece. O combo lista o que EXISTE; o universo é quem
-    // decide o que entra por padrão.
-    { incluirCancelado: true }
-  )
 
-  const sql = /* sql */ `
+  const semDimensao = {
+    ...f,
+    cidade: undefined,
+    equipe: undefined,
+    catalogo: undefined,
+    tipo: undefined,
+    status: undefined,
+    categoria2: undefined,
+    tecnico: undefined,
+    base: undefined,
+  }
+
+  // sem `incluirCancelado`, 'Cancelado' nunca apareceria no combo de status — a
+  // exclusão padrão do universo o esconderia, e a pessoa não teria como pedir a
+  // única visão em que ele aparece. O combo lista o que EXISTE; o universo é
+  // quem decide o que entra por padrão.
+  const wAbertura = montarWhere(porAbertura(semDimensao), { incluirCancelado: true })
+  const wEncerramento = montarWhere(porEncerramento(semDimensao), { incluirCancelado: true })
+
+  /**
+   * O MESMO SELECT, RODADO UMA VEZ POR EIXO DE DATA.
+   *
+   * POR QUE DUAS VARREDURAS (achado em 11/09/2026)
+   * ──────────────────────────────────────────────
+   * O combo montava a lista só pelo eixo de CRIAÇÃO, e desde que o MTTR passou
+   * a contar pelo eixo de ENCERRAMENTO (item J) os dois deixaram de responder à
+   * mesma pergunta na mesma tela. O sintoma real, em setembro/2026:
+   *
+   *   combo de Equipe .......... Equipe Field Service
+   *   cartão de MTTR contava ... Equipe Field Service, Equipe CAOC,
+   *                              Técnica [Nova Santa Rita]
+   *
+   * Os 3 protocolos das duas equipes ausentes foram criados em março e julho,
+   * então saíam do combo — mas foram ENCERRADOS em setembro, e sozinhos levavam
+   * o MTTR do mês de 13:03 para 21:54. **A tela escondia a causa do próprio
+   * número:** quem visse o salto de 32% não achava explicação em filtro nenhum,
+   * porque a equipe responsável não estava entre as opções.
+   *
+   * A lista passa a refletir o que existe no período por QUALQUER eixo. É a
+   * mesma regra que já valia para o `Cancelado` logo acima — o combo lista o
+   * que EXISTE; o universo é quem decide o que entra por padrão.
+   *
+   * ⚠️ POR QUE NÃO UM `OR` ENTRE AS DUAS DATAS: está medido e proibido em
+   * `base.ts` — 668 ms viram 5.902 ms, porque o OR sobre duas colunas de data
+   * descarta os dois índices. Duas janelas contíguas custam 310–365 ms cada.
+   *
+   * E aqui elas custam menos ainda em tempo de parede: entram no mesmo
+   * `Promise.all` do `sqlBase`, que é a consulta mais lenta (~5,8 s no ano).
+   * O total continua sendo o da mais lenta, não a soma.
+   */
+  const selecionar = (clausula: string) => /* sql */ `
     SELECT
       array_agg(DISTINCT p.city)     FILTER (WHERE nullif(trim(p.city), '')     IS NOT NULL) AS cidade,
       array_agg(DISTINCT t.title)    FILTER (WHERE nullif(trim(t.title), '')    IS NOT NULL) AS equipe,
@@ -61,7 +93,7 @@ export async function obterOpcoesFiltro(f: Filtros): Promise<{ data: OpcoesFiltr
       array_agg(DISTINCT cat2.title) FILTER (WHERE nullif(trim(cat2.title), '') IS NOT NULL) AS categoria2,
       array_agg(DISTINCT resp.name)  FILTER (WHERE nullif(trim(resp.name), '')  IS NOT NULL) AS tecnico
     ${FROM}
-    ${w.sql}
+    ${clausula}
   `
 
   /**
@@ -133,8 +165,11 @@ export async function obterOpcoesFiltro(f: Filtros): Promise<{ data: OpcoesFiltr
        -- catálogo trazendo trabalho que não é manutenção), e mexe em valor.
        AND v.region_title LIKE $5`
 
-  const [r, rb] = await Promise.all([
-    consultarErp<Record<keyof OpcoesFiltro, string[] | null>>(sql, w.params),
+  type LinhaOpcoes = Record<keyof OpcoesFiltro, string[] | null>
+
+  const [rAbertura, rEncerramento, rb] = await Promise.all([
+    consultarErp<LinhaOpcoes>(selecionar(wAbertura.sql), wAbertura.params),
+    consultarErp<LinhaOpcoes>(selecionar(wEncerramento.sql), wEncerramento.params),
     consultarErp<{ base: string[] | null; executor: string[] | null }>(sqlBase, [
       f.de,
       f.ate,
@@ -143,27 +178,30 @@ export async function obterOpcoesFiltro(f: Filtros): Promise<{ data: OpcoesFiltr
       `%${TRILHA_MANUTENCAO}%`,
     ]),
   ])
-  const linha = r.rows[0]
 
-  const ordenar = (a: string[] | null | undefined) =>
-    [...(a ?? [])].sort((x, y) => x.localeCompare(y, 'pt-BR'))
+  const porCriacao = rAbertura.rows[0]
+  const porFim = rEncerramento.rows[0]
+
+  /** União ordenada, sem repetição — a lista é um conjunto, não uma contagem. */
+  const unir = (...listas: (string[] | null | undefined)[]) =>
+    [...new Set(listas.flatMap((l) => l ?? []))].sort((x, y) => x.localeCompare(y, 'pt-BR'))
 
   return {
-    ms: r.ms + rb.ms,
+    // o `ms` é o custo REAL percebido: as três consultas correm juntas, então o
+    // que a pessoa espera é a mais lenta, não a soma das três.
+    ms: Math.max(rAbertura.ms, rEncerramento.ms, rb.ms),
     data: {
-      base: ordenar(rb.rows[0]?.base),
-      cidade: ordenar(linha?.cidade),
-      equipe: ordenar(linha?.equipe),
-      catalogo: ordenar(linha?.catalogo),
-      tipo: ordenar(linha?.tipo),
-      status: ordenar(linha?.status),
-      categoria2: ordenar(linha?.categoria2),
+      base: unir(rb.rows[0]?.base),
+      cidade: unir(porCriacao?.cidade, porFim?.cidade),
+      equipe: unir(porCriacao?.equipe, porFim?.equipe),
+      catalogo: unir(porCriacao?.catalogo, porFim?.catalogo),
+      tipo: unir(porCriacao?.tipo, porFim?.tipo),
+      status: unir(porCriacao?.status, porFim?.status),
+      categoria2: unir(porCriacao?.categoria2, porFim?.categoria2),
       // união responsáveis ∪ executores, porque o filtro atende os dois grãos:
       // nas telas de protocolo ele casa com o responsável, na Produtividade com
       // quem foi ao cliente.
-      tecnico: ordenar([
-        ...new Set([...(linha?.tecnico ?? []), ...(rb.rows[0]?.executor ?? [])]),
-      ]),
+      tecnico: unir(porCriacao?.tecnico, porFim?.tecnico, rb.rows[0]?.executor),
     },
   }
 }
