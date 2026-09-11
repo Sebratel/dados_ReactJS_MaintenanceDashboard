@@ -85,11 +85,62 @@ function criar(): Redis | null {
   })
 
   cliente.on('error', (e: Error) => {
-    // Não pode ser fatal: o Redis é opcional por desenho. Log e segue.
-    console.warn('[redis] erro de conexão:', e.message)
+    // Não pode ser fatal: o Redis é opcional por desenho. Log e segue —
+    // mas sem repetir, senão um Redis fora do ar vira enxurrada no log.
+    registrarFalha(e.message)
   })
 
   return cliente
+}
+
+/**
+ * DISJUNTOR (circuit breaker).
+ *
+ * POR QUE EXISTE: sem ele, um Redis inalcançável gerava DOIS avisos por
+ * requisição (leitura + gravação) — 27 linhas em um minuto de uso medido em
+ * 11/09/2026. Num log que rotaciona a 10 MB, esse ruído enterra o erro de
+ * verdade, e ainda paga uma tentativa de conexão por requisição.
+ *
+ * Depois de `LIMITE_FALHAS` seguidas, o módulo PARA de chamar o Redis por
+ * `COOLDOWN_MS` e volta a servir só pelo L1. Loga a TRANSIÇÃO (caiu / voltou),
+ * nunca a falha individual.
+ *
+ * O caso mais comum disto disparar não é incidente: em desenvolvimento o
+ * `REDIS_HOST` costuma ser um nome de rede Docker (ex.: `redis-alpine`) que só
+ * resolve dentro do servidor. Localmente ele nunca vai responder — e é correto
+ * que o dashboard siga funcionando sem reclamar a cada clique.
+ */
+const LIMITE_FALHAS = 3
+const COOLDOWN_MS = Number(process.env.REDIS_COOLDOWN_MS ?? 60_000)
+
+let falhasSeguidas = 0
+let pausadoAte = 0
+
+function registrarFalha(motivo: string): void {
+  falhasSeguidas++
+  if (falhasSeguidas === LIMITE_FALHAS) {
+    pausadoAte = Date.now() + COOLDOWN_MS
+    console.warn(
+      `[redis] indisponível (${motivo}). Pausando por ${COOLDOWN_MS / 1000}s; ` +
+        'o cache L1 continua atendendo normalmente.'
+    )
+  } else if (falhasSeguidas > LIMITE_FALHAS && Date.now() >= pausadoAte) {
+    // venceu o cooldown e falhou de novo: renova em silêncio
+    pausadoAte = Date.now() + COOLDOWN_MS
+  }
+}
+
+function registrarSucesso(): void {
+  if (falhasSeguidas >= LIMITE_FALHAS) {
+    console.info('[redis] voltou a responder.')
+  }
+  falhasSeguidas = 0
+  pausadoAte = 0
+}
+
+/** `true` enquanto o disjuntor está aberto — nem tenta chamar o Redis. */
+function pausado(): boolean {
+  return Date.now() < pausadoAte
 }
 
 const cliente: Redis | null = globalParaRedis.__redis ?? criar()
@@ -119,13 +170,14 @@ async function comTimeout<T>(p: Promise<T>): Promise<T | null> {
  * erro, chave ausente, JSON corrompido) — o chamador trata tudo como miss.
  */
 export async function lerCompartilhado<T>(chave: string): Promise<T | null> {
-  if (!cliente) return null
+  if (!cliente || pausado()) return null
   try {
     const bruto = await comTimeout(cliente.get(PREFIXO + chave))
+    registrarSucesso()
     if (!bruto) return null
     return JSON.parse(bruto) as T
   } catch (e) {
-    console.warn('[redis] falha ao ler:', e instanceof Error ? e.message : e)
+    registrarFalha(e instanceof Error ? e.message : String(e))
     return null
   }
 }
@@ -139,14 +191,15 @@ export async function gravarCompartilhado(
   valor: unknown,
   ttlSegundos: number
 ): Promise<void> {
-  if (!cliente) return
+  if (!cliente || pausado()) return
   try {
     const bruto = JSON.stringify(valor)
     if (bruto.length > TAMANHO_MAXIMO_BYTES) return
 
     // 'EX' garante que nenhuma chave nossa fique sem expiração
     await comTimeout(cliente.set(PREFIXO + chave, bruto, 'EX', ttlSegundos))
+    registrarSucesso()
   } catch (e) {
-    console.warn('[redis] falha ao gravar:', e instanceof Error ? e.message : e)
+    registrarFalha(e instanceof Error ? e.message : String(e))
   }
 }
