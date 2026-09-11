@@ -30,15 +30,30 @@ function criar(): Pool {
   })
 }
 
-export const poolMaria: Pool = globalParaPool.__poolMaria ?? criar()
-if (process.env.NODE_ENV !== 'production') globalParaPool.__poolMaria = poolMaria
+let poolDoModulo: Pool | undefined
+
+/**
+ * Preguiçoso pelo mesmo motivo do pool do ERP — ver o comentário longo em
+ * `erp.ts`, em resumo: `next build` importa todo módulo de rota para ler a
+ * configuração do segmento, e um `throw` no corpo do módulo derruba o build
+ * dentro do container, onde não existe `.env` de propósito.
+ */
+export function obterPoolMaria(): Pool {
+  const existente = poolDoModulo ?? globalParaPool.__poolMaria
+  if (existente) return existente
+
+  const novo = criar()
+  poolDoModulo = novo
+  if (process.env.NODE_ENV !== 'production') globalParaPool.__poolMaria = novo
+  return novo
+}
 
 export async function consultarMaria<T extends RowDataPacket>(
   sql: string,
   params: readonly unknown[] = []
 ): Promise<{ rows: T[]; ms: number }> {
   const t0 = performance.now()
-  const [rows] = await poolMaria.query<T[]>(sql, params as unknown[])
+  const [rows] = await obterPoolMaria().query<T[]>(sql, params as unknown[])
   const ms = Math.round(performance.now() - t0)
   return { rows, ms }
 }
