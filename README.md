@@ -211,6 +211,24 @@ contas — **quem controla acesso é `ALLOWED_DOMAIN` no servidor**.
 payload adulterado depois de assinado, token de outro projeto e domínio que
 apenas *termina* parecido com o autorizado.
 
+### A tela de login
+
+Segue o **mesmo padrão do COM · Gestão Comercial** (`comercial_pbi`): cena de
+marca à esquerda, card claro à direita com etiqueta do sistema, aviso de domínio
+e barra de rodapé. A porta de entrada dos sistemas internos é reconhecível entre
+si de propósito.
+
+O que muda em relação à de lá: a cor (vermelho da marca, não o vinho do
+relatório comercial — paleta se herda do relatório de origem, e as origens são
+diferentes) e o **motor**, que aqui é Firebase e lá é GSI. Copiar a tela não é
+copiar o mecanismo.
+
+⚠️ Esta é a única tela que **não acompanha o alternador de tema**. Ela é uma cena
+de marca, fixa, e vem antes do cabeçalho — que é onde o alternador mora. Por isso
+as cores dela são literais, num módulo CSS próprio (`login.module.css`), e não
+tokens: token aqui viraria uma cena que se desmonta sozinha no tema escuro. As 8
+telas de dados seguem o tema normalmente.
+
 ### Sessão
 
 O cookie `sessao_manutencao` é **HttpOnly** e guarda o próprio ID token, que vale
