@@ -1,8 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { Provedores } from '@/components/Provedores'
-import { SessaoFirebase } from '@/components/SessaoFirebase'
-import { obterConfigFirebase } from '@/server/auth/configCliente'
 
 export const metadata: Metadata = {
   title: 'Manutenção FTTX · Sebratel',
@@ -32,15 +30,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="google" content="notranslate" />
       </head>
       <body>
-        <Provedores>
-          {/*
-            Envolve TUDO, login inclusive: é quem mantém o cookie de sessão em
-            dia com o token do Firebase enquanto a aba fica aberta. A moldura do
-            dashboard (cabeçalho e filtros) não está mais aqui — ela vive no
-            layout do grupo `(dashboard)`, para a tela de login não herdá-la.
-          */}
-          <SessaoFirebase config={obterConfigFirebase()}>{children}</SessaoFirebase>
-        </Provedores>
+        {/*
+          ⚠️ NADA DE CONFIGURAÇÃO DE AMBIENTE AQUI.
+
+          Este layout é o único que envolve TODAS as rotas, inclusive as 8 telas
+          de dados, que são pré-renderizadas estaticamente. Componente de
+          servidor em rota estática roda UMA VEZ, no `next build` — então
+          qualquer `process.env` lido aqui é CONGELADO no HTML.
+
+          Foi o que aconteceu com a configuração do Firebase: na máquina de
+          desenvolvimento o `.env` existe durante o build e a chave era assada no
+          HTML; no container, que constrói sem `.env` de propósito, o mesmo HTML
+          nascia com `"config":null`. Resultado no Portainer: o login funcionava
+          (aquela página é dinâmica), mas dentro do dashboard o SDK do Firebase
+          nunca inicializava — sem avatar, sem "Sair", e sem renovação de token,
+          de modo que a sessão caía sozinha quando o cookie vencia.
+
+          A leitura do ambiente mudou para `(dashboard)/layout.tsx`, que é
+          dinâmico e por isso roda a cada request. Ver o comentário de lá.
+        */}
+        <Provedores>{children}</Provedores>
       </body>
     </html>
   )
