@@ -6,6 +6,7 @@ import { STATUS_CANCELADO, TIPOS_PREVENTIVOS } from '@/config/regras-negocio'
 import { EIXOS_DATA, GRANULARIDADES, parsearFiltros, presetsPeriodo, type Filtros } from '@/lib/filtros'
 import { fmtData } from '@/lib/formato'
 import { useOpcoesFiltro } from '@/lib/useIndicador'
+import { telaDoCaminho } from '@/config/telas'
 
 const CAMPOS_MULTI = [
   // Base primeiro de propósito: é o corte de supervisão, o mais usado.
@@ -76,6 +77,38 @@ export function BarraFiltros() {
     const valido = filtros.tipo.filter((t) => tiposPermitidos.includes(t))
     if (valido.length !== filtros.tipo.length) aplicar({ tipo: valido })
   }, [tiposPermitidos, filtros.tipo, aplicar])
+
+  /**
+   * A BARRA SÓ EXISTE NAS TELAS DE DADOS, E QUEM DECIDE É ESTE COMPONENTE.
+   *
+   * Antes a decisão ficava no `(dashboard)/layout.tsx`, que envolvia a barra num
+   * `{!ehConfiguracoes && …}`. A regra estava certa; o valor é que não chegava.
+   * `ehConfiguracoes` vem do cabeçalho `x-caminho`, posto pelo middleware — e o
+   * App Router REAPROVEITA o layout compartilhado quando só a página muda, então
+   * ele ficava com o caminho da tela ANTERIOR. Os dois sintomas, medidos em
+   * 14/09/2026 e reproduzíveis por qualquer um:
+   *
+   *   Preventivos --(menu)--> Configurações : barra aparecia onde não filtra nada
+   *   Configurações --(menu)--> Tempos      : barra SUMIA de uma tela de trabalho
+   *
+   * O segundo é o grave: sem filtro, a tela de Tempos não serve para nada, e
+   * nada na tela sugere que recarregar resolve. `export const dynamic =
+   * 'force-dynamic'` não cobre isso — ele garante render por requisição, não que
+   * o roteador peça o layout de novo.
+   *
+   * Aqui o problema não existe: `usePathname()` é do roteador do cliente e
+   * acompanha a navegação. O componente já o usava para outra coisa.
+   *
+   * ⚠️ ISTO CORRIGE O SINTOMA DA BARRA, NÃO A CAUSA. O mesmo `caminho` congelado
+   * decide o `permitido` do layout — ver item Z de docs/06. Com a barra
+   * consertada o sinal visível some e a causa continua; tratar lá é o que fecha.
+   *
+   * O teste é o CATÁLOGO e não uma lista de rotas proibidas: `telaDoCaminho`
+   * conhece as 8 telas de dados, e `/configuracoes` está fora dele por desenho
+   * (ver `config/telas.ts`). Assim, rota nova que não seja tela de dados nasce
+   * sem a barra por omissão, em vez de esperar que alguém lembre de listá-la.
+   */
+  if (!telaDoCaminho(pathname)) return null
 
   return (
     <div

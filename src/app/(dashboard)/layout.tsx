@@ -88,13 +88,24 @@ export default async function LayoutDashboard({ children }: { children: React.Re
 
       {permitido ? (
         <>
-          {/* A barra de filtros some na tela de Configurações: lá não há o que
-              recortar, e filtro que não faz nada é pior que filtro ausente. */}
-          {!ehConfiguracoes && (
-            <Suspense fallback={<div className="h-[49px]" />}>
-              <BarraFiltros />
-            </Suspense>
-          )}
+          {/*
+            A barra só existe nas telas de dados — mas QUEM DECIDE ISSO é a
+            própria `BarraFiltros`, pelo `usePathname()`, e não este layout.
+
+            Aqui havia um `{!ehConfiguracoes && …}`. A regra era a certa e o
+            valor é que não chegava: `ehConfiguracoes` sai de `x-caminho`, e o
+            App Router reaproveita o layout compartilhado quando só a página
+            muda — ele ficava com o caminho da tela ANTERIOR. O sintoma feio não
+            era a barra sobrando em Configurações, era ela SUMINDO de Tempos na
+            volta pelo menu, deixando a tela sem filtro nenhum.
+
+            ⚠️ MESMA CAUSA, OUTRA METADE: o `permitido` acima sai do MESMO
+            `caminho` congelado. Isto aqui não conserta aquilo — ver item Z de
+            docs/06 e conversar com quem escreveu a matriz de acesso.
+          */}
+          <Suspense fallback={<div className="h-[49px]" />}>
+            <BarraFiltros />
+          </Suspense>
           <main className="px-4 py-4">{children}</main>
         </>
       ) : (

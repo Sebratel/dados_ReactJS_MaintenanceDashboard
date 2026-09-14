@@ -79,3 +79,38 @@ describe('mapa de indicador para tela', () => {
     }
   })
 })
+
+/**
+ * O catálogo ganhou um SEGUNDO uso em 14/09/2026: `BarraFiltros` pergunta a ele
+ * se a rota atual é tela de dados, e se não for não se desenha.
+ *
+ * Antes quem decidia era o `(dashboard)/layout.tsx`, comparando com
+ * '/configuracoes'. A regra estava certa e o valor não chegava — o App Router
+ * reaproveita o layout compartilhado, então o caminho ficava o da tela anterior
+ * e a barra SUMIA de Tempos na volta pelo menu. Ver item Z de docs/06.
+ *
+ * Estes testes prendem o contrato novo: se alguém tirar `/configuracoes` do
+ * limbo e colocá-lo no catálogo, a barra de filtros volta a aparecer lá — e o
+ * build avisa antes de a tela fazer isso em produção.
+ */
+describe('telaDoCaminho como regra da barra de filtros', () => {
+  const AS_OITO = ['/', '/operacao', '/tempos', '/produtividade', '/recorrencia',
+    '/preventivos', '/ofensores', '/protocolos']
+
+  it('reconhece as 8 telas de dados — nelas a barra aparece', () => {
+    for (const caminho of AS_OITO) {
+      expect(telaDoCaminho(caminho), `${caminho} deveria estar no catálogo`).toBeDefined()
+    }
+  })
+
+  it('NÃO reconhece /configuracoes — lá não há o que recortar', () => {
+    expect(telaDoCaminho('/configuracoes')).toBeUndefined()
+  })
+
+  it('rota desconhecida nasce SEM barra, em vez de esperar quem a proíba', () => {
+    // O oposto de uma lista de proibidos: tela nova que não seja de dados não
+    // precisa ser lembrada por ninguém para não ganhar filtro que não usa.
+    expect(telaDoCaminho('/rota-que-ainda-nao-existe')).toBeUndefined()
+    expect(telaDoCaminho('/login')).toBeUndefined()
+  })
+})
