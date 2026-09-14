@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { buscarJson } from '@/lib/clienteHttp'
 import type { IdTela, Papel, Tela } from '@/config/telas'
+import { AbaIA } from './AbaIA'
 
 /**
  * Configurações — quem entra e o que cada um vê.
@@ -32,7 +33,7 @@ type Rascunho = { usuarios: UsuarioConfig[]; telas: MatrizTela[]; removidos: str
 
 export function Conteudo() {
   const qc = useQueryClient()
-  const [aba, setAba] = useState<'usuarios' | 'telas'>('usuarios')
+  const [aba, setAba] = useState<'usuarios' | 'telas' | 'ia'>('usuarios')
   const [rascunho, setRascunho] = useState<Rascunho | null>(null)
   const [erroSalvar, setErroSalvar] = useState<string | null>(null)
 
@@ -118,6 +119,7 @@ export function Conteudo() {
           [
             ['usuarios', 'Usuários'],
             ['telas', 'Telas'],
+            ['ia', 'IA'],
           ] as const
         ).map(([id, rotulo]) => (
           <button
@@ -139,11 +141,14 @@ export function Conteudo() {
         ))}
       </div>
 
-      {aba === 'usuarios' ? (
-        <AbaUsuarios rascunho={rascunho} setRascunho={editar} />
-      ) : (
+      {aba === 'usuarios' && <AbaUsuarios rascunho={rascunho} setRascunho={editar} />}
+      {aba === 'telas' && (
         <AbaTelas rascunho={rascunho} setRascunho={editar} catalogo={data.catalogo} />
       )}
+      {/* A aba de IA grava sozinha — ela lida com credencial, e credencial nao
+          fica pendurada num rascunho que alguem pode descartar sem querer. Por
+          isso ela nao participa da barra de Salvar abaixo. */}
+      {aba === 'ia' && <AbaIA />}
 
       <BarraSalvar
         pendentes={pendentes}

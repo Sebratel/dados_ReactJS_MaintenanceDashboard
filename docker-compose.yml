@@ -109,6 +109,13 @@ services:
       # contra ficar sem ninguém capaz de abrir Configurações.
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
 
+      # ---- IA (opcional) ----
+      # APP_SECRET cifra a chave do provedor de IA em repouso. Sem ele o
+      # cadastro de IA fica bloqueado; o resto do dashboard funciona igual.
+      # ⚠️ Trocá-lo torna a chave gravada ilegível e exige cadastrá-la de novo.
+      APP_SECRET: ${APP_SECRET:-}
+      IA_TIMEOUT_MS: ${IA_TIMEOUT_MS:-60000}
+
       # ---- limites de memória do cache ----
       # Teto do cache L1 em MB. Precisa caber com folga dentro do
       # --max-old-space-size abaixo: uma entrada de "Ano corrente" de
@@ -140,8 +147,9 @@ services:
           # swap e tudo ficar lento sem causa aparente.
           memory: 1.5g
 
-# Sem `volumes:` de propósito. Diferente do integradoras-dashboard, este app não
-# guarda estado em disco: não há papéis/permissões por tela (quem entra é
-# qualquer conta @sebratel.com.br, e a lista de contas vive no Firebase) e o
-# cache é memória + Redis. O container é descartável — recriar não perde
-# configuração de ninguém.
+# Sem `volumes:` de propósito, e isso continua valendo depois do controle de
+# acesso: papéis, matriz por tela e a chave do provedor de IA vivem no Postgres
+# da aplicação (DASH_*), não em arquivo. O cache é memória + Redis.
+#
+# Diferente do integradoras-dashboard, o container segue descartável — recriar
+# não perde configuração de ninguém, porque a configuração nunca esteve nele.

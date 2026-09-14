@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { baixarCsv, copiar, nomeDeArquivo, paraCsv, paraTsv } from '@/lib/exportar'
+import { ExplicarIA } from './ExplicarIA'
 
 export type ColunaTabela = { chave: string; rotulo: string; alinhar?: 'esq' | 'dir' }
 
@@ -64,8 +65,11 @@ export function Painel({
   }
 
   return (
+    // `relative` ancora o balao da leitura por IA logo abaixo do cabecalho —
+    // sem isso ele se posiciona pela pagina e aparece longe do painel que
+    // explicou.
     <section
-      className={`flex flex-col rounded-lg border bg-[var(--surface-1)] ${className}`}
+      className={`relative flex flex-col rounded-lg border bg-[var(--surface-1)] ${className}`}
       style={{ borderColor: 'var(--border)' }}
     >
       <header className="flex items-start justify-between gap-3 px-4 pt-3.5 pb-2">
@@ -121,6 +125,18 @@ export function Painel({
                 CSV
               </button>
             </>
+          )}
+          {/*
+            "Explicar" so aparece com tabela, porque e a tabela que vai para o
+            provedor. Num painel sem visao de tabela nao havia o que mandar.
+          */}
+          {tabela && tabela.linhas.length > 0 && (
+            <ExplicarIA
+              titulo={titulo}
+              descricao={descricao}
+              colunas={tabela.colunas}
+              linhas={tabela.linhas}
+            />
           )}
           {acoes}
           {tabela && (

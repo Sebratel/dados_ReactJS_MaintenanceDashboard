@@ -111,6 +111,7 @@ src/
 │   └── api/                indicadores/[slug], protocolos, auth/sessao, health
 ├── server/
 │   ├── auth/               ID token (Web Crypto), cookie, acesso e guardas
+│   ├── ia/                 provedores, cifra da chave e o insight dos painéis
 │   ├── db/                 pools pg e mysql2 (+ dash: o banco da aplicação)
 │   └── indicadores/        um módulo por indicador; base.ts tem o FROM composável
 ├── config/
@@ -276,6 +277,34 @@ o dashboard inteiro porque o banco de *configuração* caiu seria trocar um
 problema pequeno por um grande. A tela de Configurações e o menu do usuário
 dizem isso em letras grandes, porque o pior engano numa tela de permissão é a
 que faz acreditar que algo está protegido.
+
+### IA — leitura dos painéis
+
+Com um provedor cadastrado em **Configurações → IA**, cada painel ganha um botão
+**Explicar** que manda a tabela do painel ao provedor e mostra a leitura em prosa.
+
+Três provedores: Anthropic, OpenAI (e compatíveis — Azure, Groq, OpenRouter, via
+base URL) e Gemini. HTTP cru, não SDK: são três dialetos atrás de uma interface
+só, e a parte usada de cada API é uma requisição POST.
+
+⚠️ **Isso manda dado para fora da empresa.** Vai a mesma tabela que o painel já
+mostra, limitada a 120 linhas — e em Produtividade e Ofensores isso inclui nome
+de técnico, em Protocolos nome e endereço de cliente. Por isso a funcionalidade
+só existe depois que um administrador cadastra a chave, o aviso está na tela de
+cadastro, e a resposta vem etiquetada com provedor, modelo e quantas linhas
+foram enviadas — texto de máquina sem etiqueta vira "o sistema disse" uma
+reunião depois.
+
+A **tela de origem viaja no pedido e é conferida** no servidor: sem isso, quem
+não tem acesso a Produtividade mandaria a tabela de Produtividade e receberia a
+leitura dela, contornando a matriz pelo caminho da IA.
+
+**A chave fica cifrada em repouso** (AES-256-GCM, chave derivada de
+`APP_SECRET`) e **nunca volta para o navegador** — a tela recebe os quatro
+últimos caracteres, para conferência. Sem `APP_SECRET` o cadastro fica
+bloqueado, de propósito: chave de provedor em claro num banco que aparece em
+backup é o mesmo que publicá-la. ⚠️ Trocar o `APP_SECRET` torna a chave gravada
+ilegível; a tela detecta e pede o cadastro de novo.
 
 ### Sessão
 
