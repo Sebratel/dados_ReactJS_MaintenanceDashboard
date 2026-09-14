@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { GRANULARIDADES, parsearFiltros } from '@/lib/filtros'
+import { GRANULARIDADES, idadeMaximaDias, parsearFiltros } from '@/lib/filtros'
 import { useCoeficiente, usePreventivos } from '@/lib/useIndicador'
 import { Painel } from '@/components/Painel'
 import { StatTile } from '@/components/kpi/StatTile'
@@ -18,6 +18,17 @@ export function PreventivosConteudo() {
   const d = q.data?.data
   const t = d?.total
   const erro = q.error ? String(q.error.message) : null
+
+  /**
+   * Um balde "X a Y dias" só é observável se já passaram X dias desde a
+   * preventiva mais velha. Abaixo disso o número não é zero — é indefinido, e o
+   * cartão mostra "—" em vez de afirmar 0,0%.
+   */
+  const idadeMax = useMemo(() => idadeMaximaDias(filtros.de), [filtros.de])
+  const observavel = (diasMinimos: number) => idadeMax === null || idadeMax >= diasMinimos
+  const aindaNao = `ainda não observável: o recorte tem ${fmtInt(idadeMax)} ${
+    idadeMax === 1 ? 'dia' : 'dias'
+  }`
 
   // Mesmo card do Executivo, mas com o numerador que esta tela mede: PREVENTIVAS
   // do recorte, não o total geral de protocolos abertos (que inclui reparo,
@@ -98,6 +109,27 @@ export function PreventivosConteudo() {
           ainda não tiveram a janela inteira para reincidir. A taxa tende a{' '}
           <strong>subir</strong> conforme elas amadurecem — evite comparar este recorte
           com um período já fechado sem levar isso em conta.
+          {/* A frase abaixo é a que responde "por que os cartões de 31–60 e
+              61–90 estão zerados?". O aviso acima já dizia que as preventivas
+              eram novas, mas não tirava a conclusão — e a pergunta apareceu
+              exatamente por isso, em 14/09/2026. */}
+          {idadeMax !== null && idadeMax < 61 && (
+            <>
+              {' '}
+              A mais velha delas tem <strong>{fmtInt(idadeMax)} dias</strong>, então os
+              baldes de{' '}
+              {idadeMax < 31 ? (
+                <>
+                  <strong>31–60</strong> e <strong>61–90</strong> dias
+                </>
+              ) : (
+                <>
+                  <strong>61–90</strong> dias
+                </>
+              )}{' '}
+              ainda não podem conter nada — aparecem como “—”, e não como zero.
+            </>
+          )}
         </p>
       )}
 
@@ -115,22 +147,33 @@ export function PreventivosConteudo() {
           subirEhRuim
           destaque
         />
+        {/* Os três baldes abaixo mostram "—" enquanto o recorte não tiver idade
+            para alcançá-los — ver `idadeMaximaDias`. O limiar de cada um é o
+            PISO da faixa: 31–60 precisa de 31 dias corridos, 61–90 de 61. */}
         <StatTile
           rotulo="Reincidente em ≤ 30 dias"
-          valor={q.isLoading ? '…' : fmtFracaoPct(t?.pct30, 1)}
-          contexto="a mais grave: voltou logo"
+          valor={q.isLoading ? '…' : observavel(1) ? fmtFracaoPct(t?.pct30, 1) : '—'}
+          contexto={
+            observavel(1)
+              ? // o balde está aberto, mas pode estar pela metade: com 13 dias
+                // corridos, uma reincidência no dia 20 ainda não aconteceu.
+                idadeMax !== null && idadeMax < 30
+                ? `a mais grave: voltou logo · ${fmtInt(idadeMax)} dos 30 dias corridos`
+                : 'a mais grave: voltou logo'
+              : aindaNao
+          }
           subirEhRuim
         />
         <StatTile
           rotulo="Reincidente em 31–60 dias"
-          valor={q.isLoading ? '…' : fmtFracaoPct(t?.pct60, 1)}
-          contexto="grave, mas não a pior"
+          valor={q.isLoading ? '…' : observavel(31) ? fmtFracaoPct(t?.pct60, 1) : '—'}
+          contexto={observavel(31) ? 'grave, mas não a pior' : aindaNao}
           subirEhRuim
         />
         <StatTile
           rotulo="Reincidente em 61–90 dias"
-          valor={q.isLoading ? '…' : fmtFracaoPct(t?.pct90, 1)}
-          contexto="no fim da janela de 90 dias"
+          valor={q.isLoading ? '…' : observavel(61) ? fmtFracaoPct(t?.pct90, 1) : '—'}
+          contexto={observavel(61) ? 'no fim da janela de 90 dias' : aindaNao}
           subirEhRuim
         />
         <StatTile

@@ -198,3 +198,37 @@ export function presetsPeriodo(hoje = new Date()) {
     { id: 'ano', label: 'Ano corrente', de: iso(inicioAno), ate: iso(hoje), granularidade: 'mes' as const },
   ]
 }
+
+/**
+ * Idade, em dias, da preventiva MAIS VELHA que o recorte pode conter: de `de`
+ * até hoje. Não usa `ate` de propósito — uma preventiva aberta em 01/05
+ * continuou envelhecendo depois do fim do recorte, e é a idade REAL dela que
+ * decide se já deu tempo de reincidir.
+ *
+ * POR QUE ISTO EXISTE (14/09/2026). Os cartões "31–60 dias" e "61–90 dias"
+ * marcavam 0,0% num recorte de 14 dias, e isso lia como "conferimos e não
+ * houve". A verdade era outra: a preventiva mais velha tinha 13 dias, então
+ * nenhuma delas PODIA ter chegado aos 31. São afirmações diferentes, e a tela
+ * estava fazendo a errada.
+ *
+ * Que o cálculo bate está medido: em agosto/2026 a mais velha tem 44 dias, e o
+ * cartão de 31–60 mostra um fio de 0,3% — a janela abriu por pouco. O de 61–90
+ * segue em zero, porque 61 dias ainda não passaram. Maio, plenamente maduro,
+ * distribui nos três (4,9% / 2,8% / 3,5%).
+ *
+ * A conta é de tela, não de banco: quem classifica é o `current_date` do
+ * Postgres, e este `hoje` é o do navegador. Um dia de diferença na virada da
+ * meia-noite não muda nada aqui — a pergunta é se passaram 31 dias ou 13.
+ */
+export function idadeMaximaDias(de: string, hoje = new Date()): number | null {
+  const inicio = Date.parse(`${de}T00:00:00Z`)
+  if (!Number.isFinite(inicio)) return null
+  // `hoje` normalizado em UTC pelos componentes LOCAIS: comparar com Date.now()
+  // cru faria a conta pular um dia dependendo da hora, no fuso de São Paulo.
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const agora = Date.parse(
+    `${hoje.getFullYear()}-${pad(hoje.getMonth() + 1)}-${pad(hoje.getDate())}T00:00:00Z`
+  )
+  if (!Number.isFinite(agora)) return null
+  return Math.max(0, Math.round((agora - inicio) / 86_400_000))
+}
