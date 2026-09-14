@@ -141,10 +141,39 @@ export async function middleware(req: NextRequest) {
 
   if (!resultado.ok) return recusar(req, resultado.motivo)
 
-  // A identidade viaja para as rotas em cabeçalho de request — é o que permite
-  // o log dizer QUEM consultou, coisa que a credencial compartilhada nunca pôde.
+  /**
+   * A identidade viaja para as rotas em cabeçalho de request — é o que permite
+   * o log dizer QUEM consultou, coisa que a credencial compartilhada nunca pôde.
+   *
+   * ⚠️ ATÉ AQUI VAI A AUTENTICAÇÃO, E SÓ ELA. A AUTORIZAÇÃO (esta pessoa pode
+   * ver esta tela?) acontece no runtime Node, em `server/auth/acesso.ts`, porque
+   * o Edge não fala com Postgres. Não é divisão de gosto: é a única possível
+   * mantendo este arquivo como portão único.
+   *
+   * `x-caminho` existe por causa dessa divisão. Layout do Next não recebe a rota
+   * pedida, e sem ela a checagem de acesso teria de ser repetida em cada uma das
+   * 8 páginas — onde a página nova esqueceria, e o esquecimento apareceria como
+   * gente vendo o que não devia, não como erro.
+   */
   const cabecalhos = new Headers(req.headers)
+
+  /**
+   * ⚠️ APAGA ANTES DE ESCREVER. Sem isto, alguém manda
+   * `x-usuario-email: chefe@sebratel.com.br` na própria requisição e o servidor
+   * lê como identidade verificada.
+   *
+   * Os dois `set` abaixo já sobrescreveriam esses dois nomes (cabeçalho é
+   * insensível a caixa), mas a limpeza cobre a família inteira: no dia em que
+   * alguém ler `x-usuario-papel` sem lembrar de defini-lo aqui, o valor vem
+   * daqui e não de fora.
+   */
+  for (const nome of [...req.headers.keys()]) {
+    const n = nome.toLowerCase()
+    if (n.startsWith('x-usuario-') || n === 'x-caminho') cabecalhos.delete(nome)
+  }
+
   cabecalhos.set('x-usuario-email', resultado.claims.email)
+  cabecalhos.set('x-caminho', req.nextUrl.pathname)
 
   return NextResponse.next({ request: { headers: cabecalhos } })
 }

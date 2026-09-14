@@ -96,6 +96,7 @@ que escreve em `.next-verify/`. Se acontecer: pare o servidor, `rm -rf .next`,
 | `DB_ELLEVEN` | Postgres 13 · `dbemp00100` schema `erp` (1.384 tabelas) | ERP Voalle — protocolos, tempos, agenda. **Somente leitura.** |
 | `MARIA` | MariaDB 10.11 · `DB_Applicattion` | Base diária de clientes (denominador do coeficiente de reparos) |
 | `DB_AUTOISP` | Postgres 12 · `postgres` (53 GB) | Telemetria óptica GPON — reservado para a Fase 2 (preditivo) |
+| `DASH` | Postgres nosso · schema `dash` | **O único onde escrevemos.** Papéis, matriz de acesso e config de IA. Nenhum dado de negócio. Opcional: sem ele o controle de acesso fica inativo |
 
 ## Estrutura
 
@@ -109,10 +110,12 @@ src/
 │   ├── login/              tela de entrada (SSO Google)
 │   └── api/                indicadores/[slug], protocolos, auth/sessao, health
 ├── server/
-│   ├── auth/               verificação do ID token (Web Crypto) e cookie
-│   ├── db/                 pools pg e mysql2, type parsers de timestamp
+│   ├── auth/               ID token (Web Crypto), cookie, acesso e guardas
+│   ├── db/                 pools pg e mysql2 (+ dash: o banco da aplicação)
 │   └── indicadores/        um módulo por indicador; base.ts tem o FROM composável
-├── config/regras-negocio.ts  equipes, catálogos, categorias preventivas, metas, feriados
+├── config/
+│   ├── regras-negocio.ts   equipes, catálogos, categorias preventivas, metas
+│   └── telas.ts            catálogo das telas — o contrato de autorização
 ├── components/
 │   ├── charts/             wrappers ECharts (Chart, SerieTemporal, RankingBarras, Heatmap…)
 │   ├── kpi/StatTile.tsx
@@ -134,6 +137,7 @@ src/
 | `/preventivos` | Preventivos (qualidade da ação preventiva) | ✅ |
 | `/ofensores` | Ofensores (reparo atual × anterior, técnicos ofensores) | ✅ |
 | `/protocolos` | Indicadores Manutenção (grid detalhado + export) | ✅ |
+| `/configuracoes` | — (não existe no Power BI) | ✅ só admin: usuários e matriz de acesso |
 
 `/protocolos` é o **relatório analítico**: um protocolo por linha, 38 colunas,
 mesmos filtros globais e mesmo universo SQL das demais telas. Existe para
@@ -228,6 +232,50 @@ de marca, fixa, e vem antes do cabeçalho — que é onde o alternador mora. Por
 as cores dela são literais, num módulo CSS próprio (`login.module.css`), e não
 tokens: token aqui viraria uma cena que se desmonta sozinha no tema escuro. As 8
 telas de dados seguem o tema normalmente.
+
+### Controle de acesso — quem vê o quê
+
+Autenticar diz **quem é**; autorizar diz **o que alcança**. As duas coisas vivem
+em lugares diferentes, e não por elegância: o middleware roda no runtime Edge,
+que **não fala com Postgres**.
+
+| Onde | O quê |
+|---|---|
+| `src/middleware.ts` (Edge) | autenticação: a sessão é válida? |
+| `src/server/auth/acesso.ts` (Node) | autorização: esta pessoa vê esta tela? |
+| `src/app/(dashboard)/layout.tsx` | aplica a decisão nas 8 telas, num ponto só |
+| `src/server/auth/guarda.ts` | aplica nas rotas de API |
+
+O middleware passa o caminho pedido em `x-caminho` e o e-mail verificado em
+`x-usuario-email` — **apagando antes o que veio de fora**, senão bastaria mandar
+o cabeçalho na mão para virar outra pessoa.
+
+**Dois papéis:** `viewer` (padrão de quem entra) e `admin` (vê tudo e abre
+Configurações). A matriz por tela tem dois modos: `todos` libera para qualquer
+pessoa do domínio; `lista` restringe às marcadas.
+
+⚠️ **Esconder a tela sem fechar o endpoint não esconde nada.** Por isso
+`/api/indicadores/[slug]` e `/api/protocolos` checam acesso **antes** de qualquer
+trabalho, usando o mapa `TELAS_POR_INDICADOR` em `src/config/telas.ts`. Os
+indicadores nominais (`produtividade`, `ofensores`, `recorrencia`) têm uma tela
+cada, então restringir a tela restringe o dado de verdade — e um teste garante
+que continue assim.
+
+**Tela nova precisa entrar em `src/config/telas.ts`.** Se não entrar, ela não
+aparece na matriz e fica visível para todo mundo, em silêncio. `telas.test.ts`
+compara o catálogo com as rotas em disco e quebra o build se divergirem.
+
+**Sem administrador ninguém configura nada**, e o caminho para esse beco é
+trivial (o único admin se rebaixa e salva). Duas travas: `ADMIN_EMAILS` no
+ambiente é sempre admin e a tela não o rebaixa, e a API recusa com 409 qualquer
+gravação que deixaria o sistema sem nenhum administrador.
+
+**Sem o banco da aplicação o controle fica inativo** e todo mundo do domínio vê
+as 8 telas — como antes desta funcionalidade. É degradação deliberada: derrubar
+o dashboard inteiro porque o banco de *configuração* caiu seria trocar um
+problema pequeno por um grande. A tela de Configurações e o menu do usuário
+dizem isso em letras grandes, porque o pior engano numa tela de permissão é a
+que faz acreditar que algo está protegido.
 
 ### Sessão
 

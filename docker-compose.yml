@@ -87,6 +87,28 @@ services:
       # contas; é esta variável que o servidor confere no token.
       ALLOWED_DOMAIN: ${ALLOWED_DOMAIN:-sebratel.com.br}
 
+      # ---- banco DA APLICAÇÃO: papéis, matriz de acesso e config de IA ----
+      # É o único banco onde este sistema escreve. Sem dado de negócio: se
+      # sumir, perde-se controle de acesso, não se perde número.
+      #
+      # ⚠️ OPCIONAL. Sem DASH_HOST o dashboard sobe e funciona, com todo mundo do
+      # domínio vendo as 8 telas — e a tela de Configurações diz isso em letras
+      # grandes. Falhar fechado aqui deixaria o dashboard inacessível por causa
+      # de um recurso acessório.
+      #
+      # O schema `dash` e as 4 tabelas são criados sozinhos na primeira consulta;
+      # o usuário precisa poder criar schema no banco apontado.
+      DASH_HOST: ${DASH_HOST:-}
+      DASH_PORT: ${DASH_PORT:-5432}
+      DASH_DATABASE: ${DASH_DATABASE:-dash}
+      DASH_USER: ${DASH_USER:-dash}
+      DASH_PASSWORD: ${DASH_PASSWORD:-}
+      DASH_POOL_MAX: ${DASH_POOL_MAX:-4}
+
+      # Administradores que a tela não pode rebaixar — a porta de emergência
+      # contra ficar sem ninguém capaz de abrir Configurações.
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+
       # ---- limites de memória do cache ----
       # Teto do cache L1 em MB. Precisa caber com folga dentro do
       # --max-old-space-size abaixo: uma entrada de "Ano corrente" de

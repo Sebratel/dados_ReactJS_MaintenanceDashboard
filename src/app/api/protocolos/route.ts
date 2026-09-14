@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { ZodError } from 'zod'
 import { EIXOS_DATA, parsearFiltros, type Filtros } from '@/lib/filtros'
 import { chaveDe, memoizar } from '@/server/cache'
+import { exigirTela } from '@/server/auth/guarda'
 import {
   obterProtocolos,
   type LinhaProtocolo,
@@ -107,6 +108,14 @@ function rodapeFiltros(f: Filtros, total: number, busca: string): string[] {
 }
 
 export async function GET(req: NextRequest) {
+  /**
+   * Esta rota é a mais sensível do sistema: um protocolo por linha, com nome,
+   * endereço e telefone do cliente. Se alguma checagem de acesso pudesse faltar
+   * em algum lugar, não poderia ser aqui.
+   */
+  const guarda = await exigirTela(req, 'protocolos')
+  if (!guarda.ok) return guarda.resposta
+
   const sp = req.nextUrl.searchParams
 
   let filtros: Filtros

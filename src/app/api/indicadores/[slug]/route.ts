@@ -4,6 +4,7 @@ import { parsearFiltros } from '@/lib/filtros'
 import { INDICADORES, ehSlugValido } from '@/server/indicadores'
 import { chaveDe, memoizar } from '@/server/cache'
 import { gravarCompartilhado, lerCompartilhado } from '@/server/cacheCompartilhado'
+import { exigirIndicador } from '@/server/auth/guarda'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -20,6 +21,15 @@ export async function GET(
       { status: 404 }
     )
   }
+
+  /**
+   * A AUTORIZAÇÃO VEM ANTES DE QUALQUER TRABALHO — antes de ler filtro, antes de
+   * tocar no cache, antes do banco. Checar depois funcionaria igual do ponto de
+   * vista da resposta, mas gastaria uma consulta de 5 s na réplica de produção
+   * para no fim dizer 403.
+   */
+  const guarda = await exigirIndicador(req, slug)
+  if (!guarda.ok) return guarda.resposta
 
   let filtros
   try {

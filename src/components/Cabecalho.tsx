@@ -6,16 +6,16 @@ import { useEffect, useState } from 'react'
 import { BotaoAtualizar } from './BotaoAtualizar'
 import { MenuUsuario } from './MenuUsuario'
 
-const NAV = [
-  { href: '/', label: 'Executivo' },
-  { href: '/operacao', label: 'Operação' },
-  { href: '/tempos', label: 'Tempos' },
-  { href: '/produtividade', label: 'Produtividade' },
-  { href: '/recorrencia', label: 'Recorrência' },
-  { href: '/preventivos', label: 'Preventivos' },
-  { href: '/ofensores', label: 'Ofensores' },
-  { href: '/protocolos', label: 'Protocolos' },
-] as const
+import { TELAS, type IdTela, type Papel } from '@/config/telas'
+
+/**
+ * A navegação sai do CATÁLOGO de telas, não de uma lista própria.
+ *
+ * Antes eram duas listas, e duas listas divergem: a tela nova entrava na
+ * navegação e não na matriz de acesso, ficando visível para todo mundo sem
+ * ninguém decidir isso. Agora `config/telas.ts` é a fonte das duas.
+ */
+const NAV = TELAS.map((t) => ({ href: t.caminho, label: t.rotulo, id: t.id }))
 
 /**
  * Cortes que existem em UMA tela so.
@@ -43,9 +43,28 @@ function queryPara(destino: string, sp: URLSearchParams): string {
   return q.toString()
 }
 
-export function Cabecalho() {
+export function Cabecalho({
+  papel,
+  telasPermitidas,
+  controleAtivo,
+}: {
+  papel: Papel
+  telasPermitidas: IdTela[]
+  controleAtivo: boolean
+}) {
   const pathname = usePathname()
   const sp = useSearchParams()
+
+  /**
+   * A navegação mostra só o que a pessoa pode abrir.
+   *
+   * Isto é conforto, NÃO é a barreira: quem digitar o endereço direto continua
+   * batendo na checagem do layout, e a API tem a sua. Esconder o link evita o
+   * clique que leva a uma tela de "sem acesso" — que é frustração sem
+   * informação, já que a pessoa não pediu nada errado.
+   */
+  const permitidas = new Set(telasPermitidas)
+  const nav = NAV.filter((n) => permitidas.has(n.id))
 
   return (
     <header
@@ -97,7 +116,7 @@ export function Cabecalho() {
         </Link>
 
         <nav className="flex items-center gap-0.5" aria-label="Seções">
-          {NAV.map((n) => {
+          {nav.map((n) => {
             const ativo = pathname === n.href
             const q = queryPara(n.href, sp)
             return (
@@ -127,7 +146,7 @@ export function Cabecalho() {
         <div className="ml-auto flex items-center gap-3">
           <BotaoAtualizar />
           <AlternadorTema />
-          <MenuUsuario />
+          <MenuUsuario papel={papel} controleAtivo={controleAtivo} />
         </div>
       </div>
     </header>

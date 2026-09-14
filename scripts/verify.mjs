@@ -15,8 +15,21 @@
  * produção, e a página passa a abrir sem CSS, com todos os assets em 404.
  */
 import { spawnSync } from 'node:child_process'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 
 const DIST = '.next-verify'
+
+/**
+ * O `next build` REESCREVE o `next-env.d.ts` apontando para o diretório de
+ * saída — aqui, `.next-verify`. É arquivo versionado, então cada `npm run
+ * verify` sujava o `git status` com uma linha que não tem nada a ver com a
+ * alteração em curso, e que já vazou para commit pelo menos uma vez.
+ *
+ * Guardamos o conteúdo antes e restauramos depois. O arquivo é regenerado pelo
+ * `next dev` de todo jeito; restaurá-lo só evita o ruído.
+ */
+const ENV_DTS = 'next-env.d.ts'
+const antes = existsSync(ENV_DTS) ? readFileSync(ENV_DTS, 'utf8') : null
 
 // comando como STRING única: com `shell: true`, passar args em array dispara
 // DEP0190 (os argumentos são concatenados, não escapados). Aqui não há entrada
@@ -27,6 +40,11 @@ const r = spawnSync('npx next build', {
   // no Windows o npx é um .cmd; sem shell:true o spawn não o encontra
   shell: true,
 })
+
+if (antes !== null && readFileSync(ENV_DTS, 'utf8') !== antes) {
+  writeFileSync(ENV_DTS, antes)
+  console.log(`  (${ENV_DTS} restaurado — o build o havia apontado para ${DIST}/)`)
+}
 
 if (r.status !== 0) {
   console.error(`\n✗ build falhou (saída ${r.status}) — saída em ${DIST}/`)
