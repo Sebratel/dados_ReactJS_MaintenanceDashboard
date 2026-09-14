@@ -540,10 +540,11 @@ function AvisoControleInativo() {
         color: 'var(--text-primary)',
       }}
     >
-      <strong>Controle de acesso inativo.</strong> O banco da aplicação (
-      <code className="text-[11px]">DASH_HOST</code>) não está configurado, então{' '}
-      <strong>todas as pessoas do domínio veem todas as telas</strong> e nada aqui pode ser
-      gravado. Configure o Postgres da aplicação e recrie o container.
+      <strong>Controle de acesso inativo.</strong> O diretório de dados não está gravável,
+      então <strong>todas as pessoas do domínio veem todas as telas</strong> e nada aqui pode
+      ser gravado. Confira o volume montado em{' '}
+      <code className="text-[11px]">/app/data</code> — no Portainer ele precisa existir na
+      stack, e o diretório precisa pertencer ao usuário <code className="text-[11px]">app</code>.
     </p>
   )
 }

@@ -1,32 +1,81 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { diretorioDados } from '@/server/armazenamento'
 
 /**
  * Cifra da chave do provedor de IA, em repouso.
  *
- * POR QUE CIFRAR SE O BANCO JÁ É NOSSO: a chave de um provedor de IA é um cartão
- * de crédito — quem a tiver gasta em nome da Sebratel. Ela vai para um banco que
- * aparece em backup, em dump de suporte e na tela de quem tem acesso de leitura
- * ao Postgres, e nenhum desses lugares precisa saber a chave. Cifrada, um dump
- * vazado não é uma fatura.
+ * POR QUE CIFRAR SE O ARQUIVO JÁ É NOSSO: a chave de um provedor de IA é um
+ * cartão de crédito — quem a tiver gasta em nome da Sebratel. Ela vive num
+ * arquivo que aparece em backup do volume, em `docker cp` de suporte e na tela
+ * de quem só foi conferir configuração, e nenhum desses lugares precisa saber a
+ * chave. Cifrada, uma cópia do arquivo não é uma fatura.
  *
  * AES-256-GCM: além de cifrar, AUTENTICA. Um blob adulterado falha ao decifrar
  * em vez de devolver lixo que viraria uma requisição estranha ao provedor.
  *
- * ⚠️ A CHAVE DE CIFRA VEM DE `APP_SECRET`. Sem ela este módulo se recusa a
- * operar, e é deliberado: derivar uma chave de algo previsível (nome do host,
- * string fixa no código) daria a aparência de cifra com a segurança de base64.
- * Trocar o `APP_SECRET` torna o que está gravado ilegível — a tela trata isso
+ * DE ONDE VEM A CHAVE DE CIFRA, em ordem:
+ *   1. `APP_SECRET` no ambiente — o caminho recomendado, e o único em que a
+ *      chave não mora no mesmo lugar que o dado que ela protege.
+ *   2. `data/.secret`, gerado aleatoriamente na primeira vez. Mesma metodologia
+ *      do COM · Gestão Comercial: funciona sem configuração extra e sobrevive ao
+ *      recriar o container, porque o diretório é um volume.
+ *
+ * ⚠️ O QUE A OPÇÃO 2 CUSTA, dito claramente: a chave passa a ficar AO LADO do
+ * arquivo que ela cifra. Quem levar o volume leva os dois, e a cifra deixa de
+ * proteger contra vazamento do volume — continua protegendo contra o caso mais
+ * comum, que é a chave aparecer em claro num backup, num dump de suporte ou na
+ * tela de quem só foi ler configuração. Definir `APP_SECRET` fecha essa brecha.
+ *
+ * Trocar a origem da chave torna o que está gravado ilegível — a tela trata isso
  * como "chave ilegível, cadastre de novo", não como erro genérico.
  */
 
 const ALGORITMO = 'aes-256-gcm'
 
+let cacheDoArquivo: string | null = null
+
+/**
+ * A chave guardada em `data/.secret`, gerando-a na primeira vez.
+ *
+ * `mode: 0o600` para o arquivo nascer legível só pelo dono — num volume
+ * compartilhado, permissão padrão deixaria a chave de cifra legível por
+ * qualquer processo que monte o mesmo diretório.
+ */
+function segredoDoArquivo(): string | null {
+  if (cacheDoArquivo) return cacheDoArquivo
+  const arquivo = join(diretorioDados(), '.secret')
+  try {
+    if (existsSync(arquivo)) {
+      const lido = readFileSync(arquivo, 'utf8').trim()
+      if (lido) {
+        cacheDoArquivo = lido
+        return lido
+      }
+    }
+    const novo = randomBytes(48).toString('base64')
+    mkdirSync(diretorioDados(), { recursive: true })
+    writeFileSync(arquivo, `${novo}\n`, { encoding: 'utf8', mode: 0o600 })
+    console.info(
+      `[cripto] chave de cifra gerada em ${arquivo} — defina APP_SECRET no ambiente para controlá-la.`
+    )
+    cacheDoArquivo = novo
+    return novo
+  } catch (e) {
+    console.warn(
+      `[cripto] não consegui preparar ${arquivo}: ${e instanceof Error ? e.message : String(e)}`
+    )
+    return null
+  }
+}
+
 function segredo(): Buffer {
-  const bruto = process.env.APP_SECRET
+  const bruto = process.env.APP_SECRET?.trim() || segredoDoArquivo()
   if (!bruto || bruto.length < 16) {
     throw new Error(
-      'APP_SECRET ausente ou curto demais (mínimo 16 caracteres). ' +
-        'Sem ele a chave do provedor de IA não pode ser guardada com segurança.'
+      'Sem chave de cifra: defina APP_SECRET no ambiente, ou deixe o diretório ' +
+        'de dados gravável para que uma seja gerada em data/.secret.'
     )
   }
   // SHA-256 para transformar um segredo de tamanho livre nos 32 bytes que o

@@ -26,7 +26,7 @@ type ConfigIa = {
   chaveIlegivel: boolean
   atualizadoEm: string | null
   atualizadoPor: string | null
-  faltaBanco: boolean
+  faltaArmazenamento: boolean
   faltaSegredo: boolean
   tipos: Tipo[]
 }
@@ -119,7 +119,7 @@ export function AbaIA() {
   if (error) return <Caixa erro>{error instanceof Error ? error.message : String(error)}</Caixa>
   if (!data) return <Caixa>Sem configuração para mostrar.</Caixa>
 
-  const bloqueado = data.faltaBanco || data.faltaSegredo
+  const bloqueado = data.faltaArmazenamento || data.faltaSegredo
 
   return (
     <section className="grid gap-4">
@@ -142,24 +142,27 @@ export function AbaIA() {
         navegador, mas o dado enviado sai para o provedor escolhido.
       </p>
 
-      {data.faltaBanco && (
+      {data.faltaArmazenamento && (
         <Caixa erro>
-          O banco da aplicação (<code>DASH_HOST</code>) não está configurado — sem ele não há
-          onde guardar a chave.
+          O diretório de dados não está gravável — sem ele não há onde guardar a chave.
+          Confira o volume montado em <code>/app/data</code>.
         </Caixa>
       )}
 
       {data.faltaSegredo && (
         <Caixa erro>
-          <code>APP_SECRET</code> não está definido no servidor. Ele é a chave que cifra a
-          credencial do provedor em repouso; sem ele o cadastro fica bloqueado de propósito.
+          Sem chave de cifra. Normalmente ela é gerada sozinha em{' '}
+          <code>data/.secret</code> na primeira vez — se esta mensagem aparece, o diretório
+          de dados não está gravável. Definir <code>APP_SECRET</code> no ambiente também
+          resolve, e é o caminho recomendado.
         </Caixa>
       )}
 
       {data.chaveIlegivel && (
         <Caixa erro>
-          Há uma chave gravada que <strong>não abre</strong> com o <code>APP_SECRET</code>{' '}
-          atual — provavelmente ele mudou. Cadastre a chave novamente.
+          Há uma chave gravada que <strong>não abre</strong> com a chave de cifra atual —
+          provavelmente o <code>APP_SECRET</code> mudou, ou o <code>data/.secret</code> se
+          perdeu com o volume. Cadastre a chave novamente.
         </Caixa>
       )}
 

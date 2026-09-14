@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
   if (!guarda.ok) return guarda.resposta
 
   try {
-    return NextResponse.json(await lerConfigPublica())
+    return NextResponse.json(lerConfigPublica())
   } catch (e) {
     console.error('[config/ia] leitura falhou:', e instanceof Error ? e.message : String(e))
     return erro('não consegui ler a configuração de IA', 503)
@@ -73,12 +73,12 @@ export async function PUT(req: NextRequest) {
   }
 
   try {
-    await salvarConfig(
+    salvarConfig(
       { tipo: corpo.tipo, modelo: corpo.modelo, chave: corpo.chave, baseUrl: corpo.baseUrl || null },
       guarda.acesso.email
     )
     console.info(`[config/ia] provedor alterado por ${guarda.acesso.email}`)
-    return NextResponse.json(await lerConfigPublica())
+    return NextResponse.json(lerConfigPublica())
   } catch (e) {
     console.error('[config/ia] gravação falhou:', e instanceof Error ? e.message : String(e))
     return erro(e)
@@ -90,9 +90,9 @@ export async function DELETE(req: NextRequest) {
   if (!guarda.ok) return guarda.resposta
 
   try {
-    await apagarConfig()
+    apagarConfig()
     console.info(`[config/ia] provedor removido por ${guarda.acesso.email}`)
-    return NextResponse.json(await lerConfigPublica())
+    return NextResponse.json(lerConfigPublica())
   } catch (e) {
     return erro(e, 503)
   }

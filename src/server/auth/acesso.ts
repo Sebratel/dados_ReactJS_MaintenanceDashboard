@@ -1,5 +1,5 @@
 import { TELAS, type IdTela, type Papel } from '@/config/telas'
-import { consultarDash, dashConfigurado, garantirEsquema } from '@/server/db/dash'
+import { ARQUIVO_ACESSO, gravarJson, lerJson, podeGravar } from '@/server/armazenamento'
 
 export type { Papel }
 
@@ -7,15 +7,17 @@ export type { Papel }
  * Quem pode ver o quê.
  *
  * A AUTENTICAÇÃO (é mesmo essa pessoa?) fica no middleware, no runtime Edge. A
- * AUTORIZAÇÃO (essa pessoa pode ver esta tela?) fica aqui, no runtime Node, e a
- * razão é dura: o Edge não fala com Postgres. Não é uma divisão elegante
- * escolhida no quadro branco — é a única possível mantendo o middleware como
- * portão único de entrada.
+ * AUTORIZAÇÃO (essa pessoa pode ver esta tela?) fica aqui, no runtime Node — e a
+ * separação é imposta, não escolhida: o Edge não tem sistema de arquivos.
  *
- * Consequência prática, que precisa continuar verdadeira: o middleware garante
- * que TODA requisição tem sessão válida; este módulo decide o que ela alcança.
- * Se alguém um dia mover a autenticação para cá, o buraco não aparece na tela —
- * aparece numa rota nova que esqueceu de chamar a checagem.
+ * ⚠️ NÃO HÁ CADASTRO DE LOGIN. Quem diz QUEM a pessoa é continua sendo o Google,
+ * via Firebase. Este módulo nunca vê senha, nunca cria conta e nunca convida
+ * ninguém: ele decide o que um e-mail JÁ AUTENTICADO alcança. Quem não está em
+ * lista nenhuma entra assim mesmo, como `viewer`, desde que tenha conta do
+ * domínio autorizado.
+ *
+ * Mesma metodologia do COM · Gestão Comercial: um JSON no diretório de dados,
+ * e o papel efetivo é o MAIOR entre o ambiente e o arquivo.
  */
 
 export type Acesso = {
@@ -24,64 +26,100 @@ export type Acesso = {
   /** Telas que esta pessoa pode abrir. */
   telas: Set<IdTela>
   /**
-   * De onde veio o papel. A tela de Configurações usa isto para explicar por que
-   * um administrador não pode ser rebaixado pela interface.
+   * De onde veio o papel de admin. A tela usa isto para explicar por que um
+   * administrador do ambiente não pode ser rebaixado pela interface.
    */
-  origemAdmin: 'ambiente' | 'banco' | null
-  /** `false` quando não há banco da aplicação: tudo liberado, como antes. */
+  origemAdmin: 'ambiente' | 'arquivo' | null
+  /** `false` quando o diretório de dados não está gravável: tudo liberado. */
   controleAtivo: boolean
 }
 
-/** Executor de SQL. Existe para o teste injetar um Postgres de verdade. */
-export type Executor = <T extends Record<string, unknown>>(
-  sql: string,
-  params?: readonly unknown[]
-) => Promise<T[]>
-
-const executorPadrao: Executor = async (sql, params) => {
-  await garantirEsquema()
-  return consultarDash(sql, params) as never
+type TelaGravada = {
+  modo: 'todos' | 'lista'
+  emails: string[]
+  atualizadoEm?: string
+  atualizadoPor?: string
 }
+
+type ArquivoAcesso = {
+  papeis: Record<string, string>
+  telas: Record<string, TelaGravada>
+}
+
+const VAZIO: ArquivoAcesso = { papeis: {}, telas: {} }
 
 const TODAS_AS_TELAS = new Set<IdTela>(TELAS.map((t) => t.id))
 
+const normalizar = (e: string) => e.trim().toLowerCase()
+
 /**
- * Administradores definidos no AMBIENTE, que o banco não pode revogar.
+ * Administradores definidos no AMBIENTE, que o arquivo não pode revogar.
  *
  * É a saída para o problema do ovo e da galinha: sem ninguém admin, ninguém abre
  * Configurações, e sem Configurações ninguém vira admin. Também é a porta de
- * emergência quando alguém se rebaixa por engano — a correção é uma variável de
- * ambiente e um restart, não um `UPDATE` manual no banco às pressas.
+ * emergência quando alguém se rebaixa por engano — a correção é uma variável e
+ * um restart, não editar JSON dentro do container às pressas.
  */
 export function adminsDoAmbiente(): Set<string> {
-  const bruto = process.env.ADMIN_EMAILS ?? ''
   return new Set(
-    bruto
+    (process.env.ADMIN_EMAILS ?? '')
       .split(/[,;\s]+/)
-      .map((e) => e.trim().toLowerCase())
+      .map(normalizar)
       .filter(Boolean)
   )
 }
 
-type LinhaUsuario = { email: string; papel: string; nome: string | null }
-type LinhaTela = { tela: string; modo: string }
-type LinhaPessoa = { tela: string; email: string }
+/**
+ * Lê o arquivo inteiro, saneando o que vier.
+ *
+ * O conteúdo é editável à mão (é um JSON num volume), então nada aqui confia no
+ * formato: papel desconhecido vira `viewer`, tela fora do catálogo é ignorada, e
+ * campo com tipo errado não derruba a leitura. Um arquivo editado errado deixa o
+ * acesso mais permissivo e visível, nunca o dashboard inacessível.
+ */
+function ler(): ArquivoAcesso {
+  const bruto = lerJson<Partial<ArquivoAcesso>>(ARQUIVO_ACESSO(), VAZIO)
+
+  const papeis: Record<string, string> = {}
+  for (const [email, papel] of Object.entries(bruto.papeis ?? {})) {
+    if (typeof papel === 'string') papeis[normalizar(email)] = papel === 'admin' ? 'admin' : 'viewer'
+  }
+
+  const telas: Record<string, TelaGravada> = {}
+  for (const [id, valor] of Object.entries(bruto.telas ?? {})) {
+    if (!TODAS_AS_TELAS.has(id as IdTela) || !valor) continue
+    telas[id] = {
+      modo: valor.modo === 'lista' ? 'lista' : 'todos',
+      emails: Array.isArray(valor.emails) ? valor.emails.map(normalizar).filter(Boolean) : [],
+      atualizadoEm: valor.atualizadoEm,
+      atualizadoPor: valor.atualizadoPor,
+    }
+  }
+
+  return { papeis, telas }
+}
+
+function gravar(dados: ArquivoAcesso): void {
+  gravarJson(ARQUIVO_ACESSO(), dados)
+}
 
 /**
  * Resolve o acesso de uma pessoa.
  *
- * Nunca lança: se o banco da aplicação estiver fora, devolve acesso total com
- * `controleAtivo: false`. Isso é deliberado e vale a discussão — a alternativa
- * seria trancar todo mundo fora quando o banco de CONFIGURAÇÃO cai, ou seja,
- * transformar uma indisponibilidade de recurso acessório em queda total de um
- * dashboard cujo dado nem vem dali. A barreira que importa (autenticação) segue
- * de pé, e a degradação fica visível no cabeçalho da tela de Configurações.
+ * Nunca lança: se o diretório de dados não estiver gravável, devolve acesso
+ * total com `controleAtivo: false`. É degradação deliberada — trancar todo mundo
+ * fora porque o VOLUME não montou transformaria um problema de infraestrutura
+ * acessória em queda total de um dashboard cujo dado nem vem dali. A barreira
+ * que importa (autenticação) segue de pé, e a degradação aparece em letras
+ * grandes na tela de Configurações e no menu do usuário.
  */
-export async function resolverAcesso(email: string, exec: Executor = executorPadrao): Promise<Acesso> {
-  const normalizado = email.trim().toLowerCase()
+export function resolverAcesso(email: string): Acesso {
+  const normalizado = normalizar(email)
   const ehAdminPorAmbiente = adminsDoAmbiente().has(normalizado)
+  const gravavel = podeGravar()
 
-  if (!dashConfigurado()) {
+  if (!gravavel.ok) {
+    console.warn(`[acesso] controle inativo — ${gravavel.motivo}`)
     return {
       email: normalizado,
       papel: ehAdminPorAmbiente ? 'admin' : 'viewer',
@@ -91,60 +129,35 @@ export async function resolverAcesso(email: string, exec: Executor = executorPad
     }
   }
 
-  try {
-    const usuarios = await exec<LinhaUsuario>(
-      'SELECT email, papel, nome FROM dash.usuarios WHERE email = $1',
-      [normalizado]
-    )
-    const papelBanco = usuarios[0]?.papel === 'admin' ? 'admin' : 'viewer'
-    const papel: Papel = ehAdminPorAmbiente ? 'admin' : papelBanco
+  const dados = ler()
+  const papel: Papel =
+    ehAdminPorAmbiente || dados.papeis[normalizado] === 'admin' ? 'admin' : 'viewer'
 
-    // Administrador vê tudo, sempre. Deixá-lo fora de uma tela produziria o
-    // absurdo de alguém que pode EDITAR a matriz de acesso e não pode ver o
-    // resultado da própria edição.
-    if (papel === 'admin') {
-      return {
-        email: normalizado,
-        papel,
-        telas: new Set(TODAS_AS_TELAS),
-        origemAdmin: ehAdminPorAmbiente ? 'ambiente' : 'banco',
-        controleAtivo: true,
-      }
-    }
-
-    const [modos, pessoas] = await Promise.all([
-      exec<LinhaTela>('SELECT tela, modo FROM dash.acesso_telas', []),
-      exec<LinhaPessoa>('SELECT tela, email FROM dash.acesso_tela_pessoas WHERE email = $1', [
-        normalizado,
-      ]),
-    ])
-
-    const modoPorTela = new Map(modos.map((m) => [m.tela, m.modo]))
-    const minhasTelas = new Set(pessoas.map((p) => p.tela))
-
-    const telas = new Set<IdTela>()
-    for (const t of TELAS) {
-      // Tela sem linha = 'todos'. O padrão preserva o comportamento anterior ao
-      // controle de acesso: ligar a funcionalidade não escurece o dashboard de
-      // ninguém sem alguém ter decidido isso.
-      const modo = modoPorTela.get(t.id) ?? 'todos'
-      if (modo === 'todos' || minhasTelas.has(t.id)) telas.add(t.id)
-    }
-
-    return { email: normalizado, papel, telas, origemAdmin: null, controleAtivo: true }
-  } catch (e) {
-    console.error(
-      '[acesso] banco da aplicação indisponível, liberando as telas:',
-      e instanceof Error ? e.message : String(e)
-    )
+  // Administrador vê tudo, sempre. Deixá-lo fora de uma tela produziria o
+  // absurdo de alguém que pode EDITAR a matriz e não pode ver o resultado da
+  // própria edição.
+  if (papel === 'admin') {
     return {
       email: normalizado,
-      papel: ehAdminPorAmbiente ? 'admin' : 'viewer',
+      papel,
       telas: new Set(TODAS_AS_TELAS),
-      origemAdmin: ehAdminPorAmbiente ? 'ambiente' : null,
-      controleAtivo: false,
+      origemAdmin: ehAdminPorAmbiente ? 'ambiente' : 'arquivo',
+      controleAtivo: true,
     }
   }
+
+  const telas = new Set<IdTela>()
+  for (const t of TELAS) {
+    // Tela sem entrada = 'todos'. O padrão preserva o comportamento anterior ao
+    // controle de acesso: ligar a funcionalidade não escurece o dashboard de
+    // ninguém sem alguém ter decidido isso.
+    const gravada = dados.telas[t.id]
+    if (!gravada || gravada.modo === 'todos' || gravada.emails.includes(normalizado)) {
+      telas.add(t.id)
+    }
+  }
+
+  return { email: normalizado, papel, telas, origemAdmin: null, controleAtivo: true }
 }
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -159,24 +172,21 @@ export type UsuarioConfig = {
   fixo: boolean
 }
 
-export async function listarUsuarios(exec: Executor = executorPadrao): Promise<UsuarioConfig[]> {
+export function listarUsuarios(): UsuarioConfig[] {
   const doAmbiente = adminsDoAmbiente()
-  const linhas = await exec<LinhaUsuario>(
-    'SELECT email, papel, nome FROM dash.usuarios ORDER BY email',
-    []
-  )
+  const dados = ler()
 
   const porEmail = new Map<string, UsuarioConfig>()
-  for (const l of linhas) {
-    porEmail.set(l.email, {
-      email: l.email,
-      papel: l.papel === 'admin' ? 'admin' : 'viewer',
-      nome: l.nome,
-      fixo: doAmbiente.has(l.email),
+  for (const [email, papel] of Object.entries(dados.papeis)) {
+    porEmail.set(email, {
+      email,
+      papel: papel === 'admin' ? 'admin' : 'viewer',
+      nome: null,
+      fixo: doAmbiente.has(email),
     })
   }
 
-  // Quem é admin pelo ambiente aparece na lista mesmo sem linha no banco —
+  // Quem é admin pelo ambiente aparece na lista mesmo sem entrada no arquivo —
   // senão a tela mostraria "nenhum administrador" num sistema que tem um.
   for (const email of doAmbiente) {
     const atual = porEmail.get(email)
@@ -187,90 +197,60 @@ export async function listarUsuarios(exec: Executor = executorPadrao): Promise<U
   return [...porEmail.values()].sort((a, b) => a.email.localeCompare(b.email))
 }
 
-export async function salvarUsuario(
-  email: string,
-  papel: Papel,
-  porQuem: string,
-  exec: Executor = executorPadrao
-): Promise<void> {
-  const normalizado = email.trim().toLowerCase()
-  await exec(
-    `INSERT INTO dash.usuarios (email, papel, atualizado_em, atualizado_por)
-     VALUES ($1, $2, now(), $3)
-     ON CONFLICT (email) DO UPDATE
-       SET papel = EXCLUDED.papel,
-           atualizado_em = now(),
-           atualizado_por = EXCLUDED.atualizado_por`,
-    [normalizado, papel, porQuem]
-  )
+export function salvarUsuario(email: string, papel: Papel, porQuem: string): void {
+  const dados = ler()
+  dados.papeis[normalizar(email)] = papel
+  void porQuem // a autoria fica por tela; no papel, o log do servidor já registra
+  gravar(dados)
 }
 
-export async function removerUsuario(
-  email: string,
-  exec: Executor = executorPadrao
-): Promise<void> {
-  const normalizado = email.trim().toLowerCase()
-  await exec('DELETE FROM dash.usuarios WHERE email = $1', [normalizado])
+export function removerUsuario(email: string): void {
+  const alvo = normalizar(email)
+  const dados = ler()
+  delete dados.papeis[alvo]
+
   // A pessoa sai também das listas de tela: deixar o e-mail pendurado ali faria
   // um futuro homônimo herdar acesso que ninguém lhe deu.
-  await exec('DELETE FROM dash.acesso_tela_pessoas WHERE email = $1', [normalizado])
+  for (const tela of Object.values(dados.telas)) {
+    tela.emails = tela.emails.filter((e) => e !== alvo)
+  }
+
+  gravar(dados)
 }
 
 export type MatrizTela = { tela: IdTela; modo: 'todos' | 'lista'; emails: string[] }
 
-export async function lerMatriz(exec: Executor = executorPadrao): Promise<MatrizTela[]> {
-  const [modos, pessoas] = await Promise.all([
-    exec<LinhaTela>('SELECT tela, modo FROM dash.acesso_telas', []),
-    exec<LinhaPessoa>('SELECT tela, email FROM dash.acesso_tela_pessoas ORDER BY email', []),
-  ])
-
-  const modoPorTela = new Map(modos.map((m) => [m.tela, m.modo]))
-  const porTela = new Map<string, string[]>()
-  for (const p of pessoas) {
-    const lista = porTela.get(p.tela) ?? []
-    lista.push(p.email)
-    porTela.set(p.tela, lista)
-  }
-
-  return TELAS.map((t) => ({
-    tela: t.id,
-    modo: modoPorTela.get(t.id) === 'lista' ? ('lista' as const) : ('todos' as const),
-    emails: porTela.get(t.id) ?? [],
-  }))
+export function lerMatriz(): MatrizTela[] {
+  const dados = ler()
+  return TELAS.map((t) => {
+    const gravada = dados.telas[t.id]
+    return {
+      tela: t.id,
+      modo: gravada?.modo === 'lista' ? ('lista' as const) : ('todos' as const),
+      emails: [...(gravada?.emails ?? [])].sort(),
+    }
+  })
 }
 
-export async function salvarTela(
+export function salvarTela(
   tela: IdTela,
   modo: 'todos' | 'lista',
   emails: string[],
-  porQuem: string,
-  exec: Executor = executorPadrao
-): Promise<void> {
-  await exec(
-    `INSERT INTO dash.acesso_telas (tela, modo, atualizado_em, atualizado_por)
-     VALUES ($1, $2, now(), $3)
-     ON CONFLICT (tela) DO UPDATE
-       SET modo = EXCLUDED.modo,
-           atualizado_em = now(),
-           atualizado_por = EXCLUDED.atualizado_por`,
-    [tela, modo, porQuem]
-  )
-
+  porQuem: string
+): void {
+  const dados = ler()
   /**
-   * A lista é substituída inteira, e nesta ORDEM: apaga tudo, insere o que veio.
-   *
-   * A tela manda o conjunto final, não um diff — diff exigiria que cliente e
-   * servidor concordassem sobre o estado anterior, e eles não concordam quando
-   * duas pessoas editam ao mesmo tempo. Substituir é idempotente e o pior caso é
-   * a última gravação vencer, que é o que a tela promete ao mostrar "Salvar".
+   * A lista é substituída inteira. A tela manda o conjunto final, não um diff —
+   * diff exigiria que cliente e servidor concordassem sobre o estado anterior, e
+   * eles não concordam quando duas pessoas editam ao mesmo tempo. Substituir é
+   * idempotente, e o pior caso é a última gravação vencer, que é o que a tela
+   * promete ao mostrar "Salvar".
    */
-  await exec('DELETE FROM dash.acesso_tela_pessoas WHERE tela = $1', [tela])
-
-  const limpos = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean))]
-  for (const email of limpos) {
-    await exec(
-      'INSERT INTO dash.acesso_tela_pessoas (tela, email) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-      [tela, email]
-    )
+  dados.telas[tela] = {
+    modo,
+    emails: [...new Set(emails.map(normalizar).filter(Boolean))],
+    atualizadoEm: new Date().toISOString(),
+    atualizadoPor: porQuem,
   }
+  gravar(dados)
 }

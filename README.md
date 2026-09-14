@@ -96,7 +96,6 @@ que escreve em `.next-verify/`. Se acontecer: pare o servidor, `rm -rf .next`,
 | `DB_ELLEVEN` | Postgres 13 · `dbemp00100` schema `erp` (1.384 tabelas) | ERP Voalle — protocolos, tempos, agenda. **Somente leitura.** |
 | `MARIA` | MariaDB 10.11 · `DB_Applicattion` | Base diária de clientes (denominador do coeficiente de reparos) |
 | `DB_AUTOISP` | Postgres 12 · `postgres` (53 GB) | Telemetria óptica GPON — reservado para a Fase 2 (preditivo) |
-| `DASH` | Postgres nosso · schema `dash` | **O único onde escrevemos.** Papéis, matriz de acesso e config de IA. Nenhum dado de negócio. Opcional: sem ele o controle de acesso fica inativo |
 
 ## Estrutura
 
@@ -112,7 +111,8 @@ src/
 ├── server/
 │   ├── auth/               ID token (Web Crypto), cookie, acesso e guardas
 │   ├── ia/                 provedores, cifra da chave e o insight dos painéis
-│   ├── db/                 pools pg e mysql2 (+ dash: o banco da aplicação)
+│   ├── armazenamento.ts    os JSON de configuração (acesso, IA) no volume
+│   ├── db/                 pools pg e mysql2, type parsers de timestamp
 │   └── indicadores/        um módulo por indicador; base.ts tem o FROM composável
 ├── config/
 │   ├── regras-negocio.ts   equipes, catálogos, categorias preventivas, metas
@@ -271,12 +271,41 @@ trivial (o único admin se rebaixa e salva). Duas travas: `ADMIN_EMAILS` no
 ambiente é sempre admin e a tela não o rebaixa, e a API recusa com 409 qualquer
 gravação que deixaria o sistema sem nenhum administrador.
 
-**Sem o banco da aplicação o controle fica inativo** e todo mundo do domínio vê
-as 8 telas — como antes desta funcionalidade. É degradação deliberada: derrubar
-o dashboard inteiro porque o banco de *configuração* caiu seria trocar um
-problema pequeno por um grande. A tela de Configurações e o menu do usuário
-dizem isso em letras grandes, porque o pior engano numa tela de permissão é a
-que faz acreditar que algo está protegido.
+### Onde isso é guardado
+
+**Não existe cadastro de login.** Quem diz QUEM a pessoa é continua sendo o
+Google, via Firebase: não há tabela de usuários, senha nem convite. O que se
+guarda é AUTORIZAÇÃO — o que cada e-mail já autenticado alcança.
+
+Mesma metodologia do COM · Gestão Comercial: **arquivos JSON num volume**, não um
+banco.
+
+| Arquivo | Conteúdo |
+|---|---|
+| `data/acesso.json` | papéis e matriz de telas |
+| `data/ia.json` | provedor, modelo e a chave cifrada |
+| `data/.secret` | chave de cifra, gerada sozinha se `APP_SECRET` não vier do ambiente |
+
+Um Postgres para isto seria um serviço a provisionar, um esquema a migrar e mais
+uma dependência entre o dashboard e ficar de pé — em troca de consultas que cabem
+num arquivo de 2 KB. O preço do arquivo é precisar de volume; o preço do banco
+era não subir sem ele.
+
+A gravação é **atômica** (arquivo temporário + `rename`). Escrever direto no
+destino tem uma janela em que ele está truncado, e morrer nela — deploy no meio
+de um Salvar — faria todo mundo perder o papel de uma vez.
+
+⚠️ **O volume precisa existir na stack**, e o diretório precisa pertencer ao
+usuário `app` (o Dockerfile faz o `chown`; volume Docker herda o dono do que já
+está na imagem). Sem isso o container não escreve, e o sintoma é "controle de
+acesso inativo" num sistema que parece configurado.
+
+**Sem diretório gravável o controle fica inativo** e todo mundo do domínio vê as
+8 telas — como antes desta funcionalidade. É degradação deliberada: derrubar o
+dashboard inteiro porque o volume não montou seria trocar um problema pequeno por
+um grande. A tela de Configurações e o menu do usuário dizem isso em letras
+grandes, porque o pior engano numa tela de permissão é a que faz acreditar que
+algo está protegido.
 
 ### IA — leitura dos painéis
 
@@ -299,11 +328,11 @@ A **tela de origem viaja no pedido e é conferida** no servidor: sem isso, quem
 não tem acesso a Produtividade mandaria a tabela de Produtividade e receberia a
 leitura dela, contornando a matriz pelo caminho da IA.
 
-**A chave fica cifrada em repouso** (AES-256-GCM, chave derivada de
-`APP_SECRET`) e **nunca volta para o navegador** — a tela recebe os quatro
-últimos caracteres, para conferência. Sem `APP_SECRET` o cadastro fica
-bloqueado, de propósito: chave de provedor em claro num banco que aparece em
-backup é o mesmo que publicá-la. ⚠️ Trocar o `APP_SECRET` torna a chave gravada
+**A chave fica cifrada em repouso** (AES-256-GCM, chave de `APP_SECRET` ou de
+`data/.secret`) e **nunca volta para o navegador** — a tela recebe os quatro
+últimos caracteres, para conferência. Sem `APP_SECRET` uma chave é gerada em
+`data/.secret` — funciona, mas aí a chave de cifra mora ao lado do que ela cifra;
+definir `APP_SECRET` fecha essa brecha. ⚠️ Trocá-lo torna a chave gravada
 ilegível; a tela detecta e pede o cadastro de novo.
 
 ### Sessão

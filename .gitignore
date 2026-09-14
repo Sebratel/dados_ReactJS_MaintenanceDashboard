@@ -52,6 +52,11 @@ dev-server.anterior.log
 docs/04-mudancas-de-criterio.md
 docs/06-ajustes-pendentes.md
 
+# Configuracao local do dashboard: papeis, matriz de acesso e provedor de IA.
+# Em producao isso vive num volume Docker; aqui e so a copia de quem esta
+# mexendo, e nao tem por que virar commit.
+data/
+
 # ── SO / editor ─────────────────────────────────────────────
 .DS_Store
 Thumbs.db

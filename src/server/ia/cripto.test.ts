@@ -1,4 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cifrar, criptoConfigurada, decifrar, mascarar } from './cripto'
 
 /**
@@ -10,11 +13,20 @@ import { cifrar, criptoConfigurada, decifrar, mascarar } from './cripto'
 
 const SEGREDO = 'um-segredo-de-teste-bem-longo-123456'
 
+let dir: string
+
 beforeEach(() => {
+  // DADOS_DIR aponta para um temporário mesmo nos testes que usam APP_SECRET:
+  // sem isso, um caminho de fallback esquecido escreveria `.secret` dentro do
+  // projeto, e o teste passaria sujando o repositório.
+  dir = mkdtempSync(join(tmpdir(), 'manutencao-cripto-'))
+  process.env.DADOS_DIR = dir
   process.env.APP_SECRET = SEGREDO
 })
 
 afterEach(() => {
+  rmSync(dir, { recursive: true, force: true })
+  delete process.env.DADOS_DIR
   delete process.env.APP_SECRET
 })
 
@@ -67,16 +79,51 @@ describe('cifrar/decifrar', () => {
     expect(decifrar('a.b.c')).toBeNull()
   })
 
-  it('recusa operar sem APP_SECRET', () => {
+  /**
+   * Sem APP_SECRET a cifra NÃO desiste: gera a chave em `data/.secret`, como o
+   * COM · Gestão Comercial. Estes dois testes fixam esse contrato — e o segundo
+   * fixa o limite dele.
+   *
+   * `resetModules` + import dinâmico porque a chave de arquivo fica em cache no
+   * módulo: sem isso, o teste anterior deixaria uma chave carregada e o caso do
+   * diretório indisponível passaria por engano.
+   */
+  it('sem APP_SECRET, gera a chave em data/.secret e continua funcionando', async () => {
     delete process.env.APP_SECRET
-    expect(criptoConfigurada()).toBe(false)
-    expect(() => cifrar('x')).toThrow(/APP_SECRET/)
+    vi.resetModules()
+    const cripto = await import('./cripto')
+
+    expect(cripto.criptoConfigurada()).toBe(true)
+    expect(cripto.decifrar(cripto.cifrar('chave-x'))).toBe('chave-x')
+    expect(existsSync(join(dir, '.secret'))).toBe(true)
   })
 
-  it('recusa APP_SECRET curto demais', () => {
+  it('sem APP_SECRET e sem diretório gravável, recusa operar', async () => {
+    delete process.env.APP_SECRET
+    // um arquivo comum no lugar do diretório: impossível de criar
+    const bloqueio = join(dir, 'bloqueio')
+    const { writeFileSync } = await import('node:fs')
+    writeFileSync(bloqueio, 'sou um arquivo', 'utf8')
+    process.env.DADOS_DIR = join(bloqueio, 'dentro')
+
+    vi.resetModules()
+    const cripto = await import('./cripto')
+
+    expect(cripto.criptoConfigurada()).toBe(false)
+    expect(() => cripto.cifrar('x')).toThrow(/chave de cifra/i)
+  })
+
+  it('APP_SECRET curto demais não é aceito em silêncio', async () => {
     process.env.APP_SECRET = 'curto'
-    expect(criptoConfigurada()).toBe(false)
-    expect(() => cifrar('x')).toThrow(/APP_SECRET/)
+    // um arquivo no lugar do diretório impede o fallback de salvar o caso
+    const { writeFileSync } = await import('node:fs')
+    const bloqueio = join(dir, 'bloqueio2')
+    writeFileSync(bloqueio, 'x', 'utf8')
+    process.env.DADOS_DIR = join(bloqueio, 'dentro')
+
+    vi.resetModules()
+    const cripto = await import('./cripto')
+    expect(cripto.criptoConfigurada()).toBe(false)
   })
 
   it('aguenta chave com acento e caractere fora do ASCII', () => {

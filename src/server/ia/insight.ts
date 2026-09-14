@@ -97,7 +97,7 @@ export class SemProvedorError extends Error {
 }
 
 export async function gerarInsight(p: PedidoInsight): Promise<ResultadoInsight> {
-  const cfg = await lerConfigUsavel()
+  const cfg = lerConfigUsavel()
   if (!cfg) throw new SemProvedorError()
 
   if (!p.linhas.length) {

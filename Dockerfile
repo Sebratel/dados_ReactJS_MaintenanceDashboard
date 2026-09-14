@@ -75,10 +75,21 @@ COPY --from=build --chown=app:app /app/public ./public
 # Esta linha garante que isso não aconteça mesmo nesse caso.
 RUN rm -f /app/.env /app/.env.*
 
-# Sem volume de estado: diferente do integradoras-dashboard, este app não grava
-# nada em disco. Papéis/permissões não existem aqui (entra qualquer conta do
-# domínio autorizado, e a lista de contas vive no Firebase) e o cache é memória
-# + Redis. Container descartável.
+# ⚠️ O DIRETÓRIO DE DADOS PRECISA EXISTIR E SER DO USUÁRIO `app` ANTES do
+# `USER app` abaixo.
+#
+# É aqui que ficam `acesso.json` (papéis e matriz de telas), `ia.json` e
+# `.secret`. O compose monta um volume neste caminho — e volume Docker herda o
+# dono do diretório que já existe na imagem. Sem este `chown`, ele nasce do root,
+# o processo (que roda como `app`) não consegue escrever, e o sintoma é a tela de
+# Configurações dizendo "controle de acesso inativo" num sistema que parece
+# configurado. Não se parece nem um pouco com a causa.
+RUN mkdir -p /app/data && chown -R app:app /app/data
+ENV DADOS_DIR=/app/data
+
+# O ÚNICO estado em disco é `/app/data`, acima: configuração de acesso e IA, de
+# poucos KB. Indicador nenhum passa por ali — o dado vem do ERP ao vivo, e o
+# cache é memória + Redis. Fora desse diretório o container segue descartável.
 USER app
 EXPOSE 8092
 

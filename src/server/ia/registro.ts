@@ -1,4 +1,4 @@
-import { consultarDash, dashConfigurado, garantirEsquema } from '@/server/db/dash'
+import { ARQUIVO_IA, gravarJson, lerJson, podeGravar } from '@/server/armazenamento'
 import { cifrar, criptoConfigurada, decifrar, mascarar } from './cripto'
 import {
   MODELO_SUGERIDO,
@@ -11,11 +11,12 @@ import {
 } from './provedor'
 
 /**
- * Onde a configuração de IA é guardada e lida.
+ * Onde a configuração de IA é guardada e lida: `data/ia.json`, ao lado do
+ * `acesso.json`. Mesma metodologia do COM · Gestão Comercial.
  *
- * Uma linha só, na tabela `dash.config_ia` (o CHECK `id = 1` garante isso — ver
- * o esquema em `db/dash.ts`). Duas configurações de IA fariam o sistema usar "a
- * primeira que voltar", que muda sem aviso entre reinícios.
+ * Um arquivo, uma configuração — o formato não permite duas, o que evita o
+ * problema de "usar a primeira que voltar" e mudar de comportamento entre
+ * reinícios sem ninguém ter tocado em nada.
  */
 
 /** O que a TELA pode ver. Note que a chave não está aqui. */
@@ -26,31 +27,34 @@ export type ConfigIaPublica = {
   baseUrl: string | null
   /** só os quatro últimos caracteres, para conferência */
   chaveMascarada: string | null
-  /** `true` quando há chave gravada mas ela não abre com o APP_SECRET atual */
+  /** `true` quando há chave gravada mas ela não abre com a chave de cifra atual */
   chaveIlegivel: boolean
   atualizadoEm: string | null
   atualizadoPor: string | null
   /** o que falta no servidor para a IA funcionar */
-  faltaBanco: boolean
+  faltaArmazenamento: boolean
   faltaSegredo: boolean
   tipos: { id: TipoProvedor; rotulo: string; modeloSugerido: string }[]
 }
 
-type LinhaIa = {
-  provedor: string | null
-  modelo: string | null
-  chave_cifrada: string | null
-  atualizado_em: Date | string | null
-  atualizado_por: string | null
+type ArquivoIa = {
+  provedor?: string
+  modelo?: string
+  chaveCifrada?: string
+  atualizadoEm?: string
+  atualizadoPor?: string
 }
+
+const ler = () => lerJson<ArquivoIa>(ARQUIVO_IA(), {})
+const gravar = (d: ArquivoIa) => gravarJson(ARQUIVO_IA(), d)
 
 /**
  * A base URL viaja junto do provedor, separada por `|`.
  *
- * Não ganhou coluna própria porque é um detalhe do mesmo ajuste (usar Azure ou
- * OpenRouter em vez da OpenAI), e uma coluna a mais numa tabela de linha única
- * seria uma migração para guardar o que cabe aqui. O separador é `|` porque não
- * aparece em nome de provedor nem em URL.
+ * Não ganhou campo próprio porque é um detalhe do mesmo ajuste (usar Azure ou
+ * OpenRouter em vez da OpenAI), e um campo a mais significaria tratar o arquivo
+ * antigo sem ele em toda leitura. O separador é `|` porque não aparece em nome
+ * de provedor nem em URL.
  */
 function juntar(tipo: string, baseUrl: string | null | undefined): string {
   return baseUrl ? `${tipo}|${baseUrl}` : tipo
@@ -79,25 +83,19 @@ function vazia(extras: Partial<ConfigIaPublica> = {}): ConfigIaPublica {
     chaveIlegivel: false,
     atualizadoEm: null,
     atualizadoPor: null,
-    faltaBanco: !dashConfigurado(),
+    faltaArmazenamento: !podeGravar().ok,
     faltaSegredo: !criptoConfigurada(),
     tipos: CATALOGO,
     ...extras,
   }
 }
 
-export async function lerConfigPublica(): Promise<ConfigIaPublica> {
-  if (!dashConfigurado()) return vazia()
-
-  await garantirEsquema()
-  const linhas = await consultarDash<LinhaIa>(
-    'SELECT provedor, modelo, chave_cifrada, atualizado_em, atualizado_por FROM dash.config_ia WHERE id = 1'
-  )
-  const l = linhas[0]
-  if (!l?.chave_cifrada || !l.provedor) return vazia()
+export function lerConfigPublica(): ConfigIaPublica {
+  const l = ler()
+  if (!l.chaveCifrada || !l.provedor) return vazia()
 
   const { tipo, baseUrl } = separar(l.provedor)
-  const chave = decifrar(l.chave_cifrada)
+  const chave = decifrar(l.chaveCifrada)
 
   return vazia({
     // Configurado só quando a chave ABRE: com ela ilegível, o provedor
@@ -105,33 +103,24 @@ export async function lerConfigPublica(): Promise<ConfigIaPublica> {
     // de "a chave precisa ser cadastrada de novo".
     configurado: chave !== null,
     tipo: ehTipoValido(tipo) ? tipo : null,
-    modelo: l.modelo,
+    modelo: l.modelo ?? null,
     baseUrl,
     chaveMascarada: chave ? mascarar(chave) : null,
     chaveIlegivel: chave === null,
-    atualizadoEm:
-      l.atualizado_em instanceof Date
-        ? l.atualizado_em.toISOString()
-        : (l.atualizado_em ?? null),
-    atualizadoPor: l.atualizado_por,
+    atualizadoEm: l.atualizadoEm ?? null,
+    atualizadoPor: l.atualizadoPor ?? null,
   })
 }
 
 /** A configuração COM a chave. Só para uso interno do servidor. */
-export async function lerConfigUsavel(): Promise<ConfigProvedor | null> {
-  if (!dashConfigurado()) return null
-
-  await garantirEsquema()
-  const linhas = await consultarDash<LinhaIa>(
-    'SELECT provedor, modelo, chave_cifrada FROM dash.config_ia WHERE id = 1'
-  )
-  const l = linhas[0]
-  if (!l?.chave_cifrada || !l.provedor || !l.modelo) return null
+export function lerConfigUsavel(): ConfigProvedor | null {
+  const l = ler()
+  if (!l.chaveCifrada || !l.provedor || !l.modelo) return null
 
   const { tipo, baseUrl } = separar(l.provedor)
   if (!ehTipoValido(tipo)) return null
 
-  const chave = decifrar(l.chave_cifrada)
+  const chave = decifrar(l.chaveCifrada)
   if (!chave) return null
 
   return { tipo, modelo: l.modelo, chave, baseUrl }
@@ -145,18 +134,13 @@ export type EntradaConfig = {
   baseUrl?: string | null
 }
 
-export async function salvarConfig(
-  entrada: EntradaConfig,
-  porQuem: string
-): Promise<void> {
+export function salvarConfig(entrada: EntradaConfig, porQuem: string): void {
   if (!ehTipoValido(entrada.tipo)) {
     throw new Error(`Provedor desconhecido: ${entrada.tipo}`)
   }
   if (!entrada.modelo.trim()) {
     throw new Error(`Informe o modelo (ex.: ${MODELO_SUGERIDO[entrada.tipo]}).`)
   }
-
-  await garantirEsquema()
 
   /**
    * Salvar sem mandar a chave MANTÉM a que já está lá.
@@ -166,34 +150,26 @@ export async function salvarConfig(
    * navegador, num histórico de área de transferência, ou num campo de texto que
    * alguém fotografa.
    */
+  const atual = ler()
   let cifrada: string
   if (entrada.chave?.trim()) {
     cifrada = cifrar(entrada.chave.trim())
   } else {
-    const atual = await consultarDash<{ chave_cifrada: string | null }>(
-      'SELECT chave_cifrada FROM dash.config_ia WHERE id = 1'
-    )
-    const anterior = atual[0]?.chave_cifrada
-    if (!anterior) throw new Error('Informe a chave do provedor.')
-    cifrada = anterior
+    if (!atual.chaveCifrada) throw new Error('Informe a chave do provedor.')
+    cifrada = atual.chaveCifrada
   }
 
-  await consultarDash(
-    `INSERT INTO dash.config_ia (id, provedor, modelo, chave_cifrada, atualizado_em, atualizado_por)
-     VALUES (1, $1, $2, $3, now(), $4)
-     ON CONFLICT (id) DO UPDATE
-       SET provedor = EXCLUDED.provedor,
-           modelo = EXCLUDED.modelo,
-           chave_cifrada = EXCLUDED.chave_cifrada,
-           atualizado_em = now(),
-           atualizado_por = EXCLUDED.atualizado_por`,
-    [juntar(entrada.tipo, entrada.baseUrl), entrada.modelo.trim(), cifrada, porQuem]
-  )
+  gravar({
+    provedor: juntar(entrada.tipo, entrada.baseUrl),
+    modelo: entrada.modelo.trim(),
+    chaveCifrada: cifrada,
+    atualizadoEm: new Date().toISOString(),
+    atualizadoPor: porQuem,
+  })
 }
 
-export async function apagarConfig(): Promise<void> {
-  await garantirEsquema()
-  await consultarDash('DELETE FROM dash.config_ia WHERE id = 1')
+export function apagarConfig(): void {
+  gravar({})
 }
 
 /**
@@ -201,7 +177,7 @@ export async function apagarConfig(): Promise<void> {
  *
  * Aceita a chave direto do formulário — antes de gravar — porque é assim que o
  * administrador confere se ela funciona sem antes salvar algo quebrado. Se a
- * chave não vier, usa a que está no banco.
+ * chave não vier, usa a que está gravada.
  */
 export async function listarModelos(entrada: {
   tipo: string
@@ -212,7 +188,7 @@ export async function listarModelos(entrada: {
 
   let chave = entrada.chave?.trim()
   if (!chave) {
-    const atual = await lerConfigUsavel()
+    const atual = lerConfigUsavel()
     if (!atual || atual.tipo !== entrada.tipo) {
       throw new Error('Informe a chave do provedor para listar os modelos.')
     }

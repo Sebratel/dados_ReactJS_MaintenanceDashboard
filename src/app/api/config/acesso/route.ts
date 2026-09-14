@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { TELAS, type IdTela } from '@/config/telas'
 import { exigirAdmin } from '@/server/auth/guarda'
-import { dashConfigurado, garantirEsquema } from '@/server/db/dash'
 import {
   lerMatriz,
   listarUsuarios,
@@ -11,6 +10,7 @@ import {
   salvarUsuario,
   adminsDoAmbiente,
 } from '@/server/auth/acesso'
+import { podeGravar } from '@/server/armazenamento'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -45,15 +45,15 @@ const CorpoSchema = z.object({
     .default([]),
 })
 
-async function estadoAtual() {
-  await garantirEsquema()
-  const [usuarios, telas] = await Promise.all([listarUsuarios(), lerMatriz()])
+function estadoAtual() {
+  const gravavel = podeGravar()
   return {
-    usuarios,
-    telas,
+    usuarios: listarUsuarios(),
+    telas: lerMatriz(),
     catalogo: TELAS,
     adminsFixos: [...adminsDoAmbiente()],
-    controleAtivo: true,
+    controleAtivo: gravavel.ok,
+    motivoInativo: gravavel.ok ? null : gravavel.motivo,
   }
 }
 
@@ -61,26 +61,14 @@ export async function GET(req: NextRequest) {
   const guarda = await exigirAdmin(req)
   if (!guarda.ok) return guarda.resposta
 
-  if (!dashConfigurado()) {
-    // Estado honesto em vez de erro: a tela precisa poder DIZER o que falta, e
-    // um 500 aqui apareceria como "Configurações quebrou".
-    return NextResponse.json({
-      usuarios: [],
-      telas: TELAS.map((t) => ({ tela: t.id, modo: 'todos' as const, emails: [] })),
-      catalogo: TELAS,
-      adminsFixos: [...adminsDoAmbiente()],
-      controleAtivo: false,
-    })
-  }
-
   try {
-    return NextResponse.json(await estadoAtual())
+    // Estado honesto mesmo quando o diretório não está gravável: a tela precisa
+    // poder DIZER o que falta, e um 503 aqui apareceria como "Configurações
+    // quebrou" em vez de "o volume não montou".
+    return NextResponse.json(estadoAtual())
   } catch (e) {
     console.error('[config/acesso] leitura falhou:', e instanceof Error ? e.message : String(e))
-    return NextResponse.json(
-      { erro: 'não consegui ler a configuração no banco da aplicação' },
-      { status: 503 }
-    )
+    return NextResponse.json({ erro: 'não consegui ler a configuração' }, { status: 503 })
   }
 }
 
@@ -88,9 +76,10 @@ export async function PUT(req: NextRequest) {
   const guarda = await exigirAdmin(req)
   if (!guarda.ok) return guarda.resposta
 
-  if (!dashConfigurado()) {
+  const gravavel = podeGravar()
+  if (!gravavel.ok) {
     return NextResponse.json(
-      { erro: 'banco da aplicação não configurado (defina DASH_HOST)' },
+      { erro: `não consigo gravar a configuração — ${gravavel.motivo}` },
       { status: 503 }
     )
   }
@@ -136,22 +125,17 @@ export async function PUT(req: NextRequest) {
   }
 
   try {
-    await garantirEsquema()
-
-    for (const email of removidos) await removerUsuario(email)
+    for (const email of removidos) removerUsuario(email)
     for (const u of corpo.usuarios) {
       if (removidos.has(u.email.trim().toLowerCase())) continue
-      await salvarUsuario(u.email, u.papel, quem)
+      salvarUsuario(u.email, u.papel, quem)
     }
-    for (const t of corpo.telas) await salvarTela(t.tela, t.modo, t.emails, quem)
+    for (const t of corpo.telas) salvarTela(t.tela, t.modo, t.emails, quem)
 
     console.info(`[config/acesso] alterado por ${quem}`)
-    return NextResponse.json(await estadoAtual())
+    return NextResponse.json(estadoAtual())
   } catch (e) {
     console.error('[config/acesso] gravação falhou:', e instanceof Error ? e.message : String(e))
-    return NextResponse.json(
-      { erro: 'não consegui gravar a configuração no banco da aplicação' },
-      { status: 503 }
-    )
+    return NextResponse.json({ erro: 'não consegui gravar a configuração' }, { status: 503 })
   }
 }

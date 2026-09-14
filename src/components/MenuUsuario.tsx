@@ -152,8 +152,8 @@ export function MenuUsuario({
                 color: 'var(--text-secondary)',
               }}
             >
-              Controle de acesso inativo: sem o banco da aplicação, todos do
-              domínio veem todas as telas.
+              Controle de acesso inativo: o diretório de dados não está
+              gravável, então todos do domínio veem todas as telas.
             </p>
           )}
 
