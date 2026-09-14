@@ -8,6 +8,7 @@ import {
   TIPOS_PREVENTIVOS,
 } from '@/config/regras-negocio'
 import type { Filtros } from '@/lib/filtros'
+import { truncGranularidade } from './base'
 
 /**
  * Preventivos e REINCIDENCIA pos-preventiva (docs/01 5.4).
@@ -58,6 +59,8 @@ type Classe = 'Reincidiu ≤30d' | 'Reincidiu 31–60d' | 'Reincidiu 61–90d' |
 
 type LinhaPreventivo = {
   mes: string
+  /** balde da granularidade escolhida, sempre 'YYYY-MM-DD' (início do balde) */
+  periodo: string
   base: string | null
   cidade: string | null
   categoria: string | null
@@ -99,6 +102,23 @@ export type ResultadoPreventivos = {
     porCategoria: ItemDimPreventiva[]
     /** quem ATENDEU a preventiva -- o tecnico cuja acao nao segurou */
     porTecnico: ItemDimPreventiva[]
+    /**
+     * VOLUME no balde da granularidade escolhida (dia/semana/mês), com os
+     * baldes vazios preenchidos com zero — ver `baldes()`.
+     *
+     * Separado do `porMes` de propósito: o volume responde a "quanto se fez", e
+     * aí o dia tem sinal (o volume de preventiva despenca no fim de semana — em
+     * setembro/2026, 80 numa terça contra 1 num domingo). A TAXA no mesmo dia
+     * não teria sinal nenhum: são ~15 reincidentes em 14 dias, então o domingo
+     * com 1 preventiva só pode marcar 0% ou 100%.
+     */
+    porPeriodo: {
+      periodo: string
+      preventivas: number
+      reincidentes: number
+      taxaReincidencia: number | null
+    }[]
+    /** SEMPRE mensal, qualquer que seja a granularidade — é a série da TAXA. */
     porMes: {
       mes: string
       preventivas: number
@@ -117,12 +137,77 @@ const ORDEM: Classe[] = [
   'Sem reincidência',
 ]
 
+/**
+ * Todos os baldes entre `de` e `ate`, inclusive os que não tiveram preventiva.
+ *
+ * POR QUE PREENCHER O VAZIO. Sem isto, um feriado sem nenhuma preventiva
+ * simplesmente não apareceria no eixo, e as colunas dos dias vizinhos ficariam
+ * encostadas — a leitura seria "não houve esse dia", não "houve e deu zero".
+ * É a mesma razão do `generate_series` de `serie.ts`, e aqui a lista sai em JS
+ * porque a consulta devolve linhas por DIMENSÃO, não uma série temporal.
+ *
+ * ⚠️ Aritmética em UTC de ponta a ponta, e nenhuma chamada a `new Date(string)`
+ * com data local: o processo roda em America/Sao_Paulo e a conversão jogaria
+ * '2026-09-01' para 31/08 21:00, trocando o mês do primeiro balde.
+ *
+ * Espelha `date_trunc` do Postgres: 'week' começa na SEGUNDA (ISO-8601), e o
+ * primeiro balde pode nascer ANTES de `de` — a semana que contém `de` começa na
+ * segunda anterior, e o mês que contém `de` começa no dia 1. É o mesmo
+ * comportamento do calendário de `serie.ts`, de propósito: dois painéis da
+ * mesma tela recortando o tempo diferente seria pior que a borda.
+ */
+export function baldes(de: string, ate: string, g: Filtros['granularidade']): string[] {
+  const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10)
+  const emUtc = (s: string) => Date.parse(`${s}T00:00:00Z`)
+  const DIA = 86_400_000
+
+  const fim = emUtc(ate)
+  if (!Number.isFinite(fim) || !Number.isFinite(emUtc(de))) return []
+
+  const saida: string[] = []
+
+  if (g === 'mes') {
+    const d = new Date(emUtc(de))
+    let ano = d.getUTCFullYear()
+    let mes = d.getUTCMonth()
+    for (;;) {
+      const t = Date.UTC(ano, mes, 1)
+      if (t > fim) break
+      saida.push(iso(t))
+      mes += 1
+      if (mes > 11) {
+        mes = 0
+        ano += 1
+      }
+      // guarda contra laço infinito se `ate` vier absurdo pela URL
+      if (saida.length > 600) break
+    }
+    return saida
+  }
+
+  const passo = g === 'semana' ? 7 * DIA : DIA
+  let t = emUtc(de)
+  if (g === 'semana') {
+    // getUTCDay: 0 = domingo … 6 = sábado. A segunda fica a (dow + 6) % 7 dias atrás.
+    const dow = new Date(t).getUTCDay()
+    t -= ((dow + 6) % 7) * DIA
+  }
+  for (; t <= fim; t += passo) {
+    saida.push(iso(t))
+    if (saida.length > 1200) break
+  }
+  return saida
+}
+
 export async function obterPreventivos(f: Filtros): Promise<ResultadoPreventivos> {
   const params: unknown[] = []
   const p = (v: unknown) => `$${params.push(v)}`
 
   const de = p(f.de)
   const ate = p(f.ate)
+  // interpolado e não parametrizado, como em serie.ts: `date_trunc` exige
+  // literal. O valor sai do catálogo GRANULARIDADES, nunca da URL crua.
+  const trunc = truncGranularidade(f.granularidade)
   const catalogos = `${p([...CATALOGOS_MANUTENCAO])}::text[]`
   const tiposPrev = `${p([...TIPOS_PREVENTIVOS])}::text[]`
   const catsPrev = `${p([...CATEGORIAS_PREVENTIVAS])}::text[]`
@@ -254,6 +339,18 @@ export async function obterPreventivos(f: Filtros): Promise<ResultadoPreventivos
     ),
     classificado AS (
       SELECT to_char(date_trunc('month', created), 'YYYY-MM') AS mes,
+             -- O BALDE PEDIDO NA BARRA, SEMPRE SOBRE created.
+             --
+             -- Esta tela ignora o seletor "eixo da data" de propósito: a janela
+             -- de 90 dias de reincidência começa a correr quando a preventiva é
+             -- ABERTA, então agrupá-la por encerramento ou por agenda mudaria o
+             -- balde sem mudar o que está sendo medido. O aviso na tela diz
+             -- isso ao leitor -- ver o aviso no topo de preventivos/Conteudo.tsx.
+             --
+             -- A granularidade, essa sim, passou a valer (14/09/2026): antes
+             -- era 'month' fixo, e escolher "Dia" devolvia uma coluna só. O
+             -- gráfico não estava errado, mas o silêncio fazia parecer defeito.
+             date_trunc('${trunc}', created)::date AS periodo,
              base_agenda AS base,
              cidade,
              categoria,
@@ -297,10 +394,10 @@ export async function obterPreventivos(f: Filtros): Promise<ResultadoPreventivos
          AND coalesce(team_id, -1) <> all(${equipesFora})
          ${filtroTipo}
     )
-    SELECT mes, base, cidade, categoria, tecnico, classe, recente,
+    SELECT mes, periodo::text AS periodo, base, cidade, categoria, tecnico, classe, recente,
            count(*)::int AS preventivas
       FROM classificado
-     GROUP BY 1, 2, 3, 4, 5, 6, 7`
+     GROUP BY 1, 2, 3, 4, 5, 6, 7, 8`
 
   const { rows, ms } = await consultarErp<LinhaPreventivo>(sql, params)
 
@@ -313,6 +410,7 @@ export async function obterPreventivos(f: Filtros): Promise<ResultadoPreventivos
     categoria: new Map<string, { t: number; r: number }>(),
     tecnico: new Map<string, { t: number; r: number }>(),
     mes: new Map<string, { t: number; r: number }>(),
+    periodo: new Map<string, { t: number; r: number }>(),
   }
   let total = 0
   let reincidentes = 0
@@ -336,6 +434,7 @@ export async function obterPreventivos(f: Filtros): Promise<ResultadoPreventivos
     soma(dim.categoria, r.categoria ?? '(sem categoria)')
     soma(dim.tecnico, r.tecnico ?? '(sem técnico na agenda)')
     soma(dim.mes, r.mes)
+    soma(dim.periodo, r.periodo)
   }
 
   const taxa = (a: number, b: number) => (b > 0 ? a / b : null)
@@ -371,6 +470,15 @@ export async function obterPreventivos(f: Filtros): Promise<ResultadoPreventivos
       porCidade: paraDim(dim.cidade),
       porCategoria: paraDim(dim.categoria),
       porTecnico: paraDim(dim.tecnico),
+      porPeriodo: baldes(f.de, f.ate, f.granularidade).map((periodo) => {
+        const v = dim.periodo.get(periodo) ?? { t: 0, r: 0 }
+        return {
+          periodo,
+          preventivas: v.t,
+          reincidentes: v.r,
+          taxaReincidencia: taxa(v.r, v.t),
+        }
+      }),
       porMes: [...dim.mes.entries()]
         .map(([mes, v]) => ({
           mes,

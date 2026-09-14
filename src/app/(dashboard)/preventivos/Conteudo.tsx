@@ -2,13 +2,13 @@
 
 import { useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { parsearFiltros } from '@/lib/filtros'
+import { GRANULARIDADES, parsearFiltros } from '@/lib/filtros'
 import { useCoeficiente, usePreventivos } from '@/lib/useIndicador'
 import { Painel } from '@/components/Painel'
 import { StatTile } from '@/components/kpi/StatTile'
 import { RankingSimples } from '@/components/charts/RankingSimples'
-import { ColunasMes } from '@/components/charts/ColunasMes'
-import { fmtFracaoPct, fmtInt } from '@/lib/formato'
+import { ColunasPeriodo } from '@/components/charts/ColunasPeriodo'
+import { fmtFracaoPct, fmtInt, fmtPeriodo } from '@/lib/formato'
 
 export function PreventivosConteudo() {
   const sp = useSearchParams()
@@ -52,6 +52,30 @@ export function PreventivosConteudo() {
         mesmo login em até 90 dias é <strong>reincidente</strong>. Toda preventiva do
         recorte entra na conta, independente de quando foi aberta — quanto mais cedo o
         retorno, mais grave.
+      </p>
+
+      {/*
+        Aviso necessário, não decorativo — mesmo motivo do que existe em
+        Produtividade. A barra de filtros é global e mostra "Eixo da data"
+        ativo, mas esta página só sabe ler CRIAÇÃO: a janela de 90 dias de
+        reincidência começa a correr quando a preventiva é aberta. Sem este
+        aviso, quem escolhesse "Encerramento" veria a tela não mudar e não teria
+        como saber se o filtro não se aplica ou se o dashboard travou.
+
+        A granularidade, essa, passou a valer em 14/09/2026. Antes o painel era
+        mensal à força e escolher "Dia" devolvia uma coluna só — o mesmo
+        silêncio, e ele realmente foi lido como defeito.
+      */}
+      <p
+        className="rounded-md border px-3 py-2 text-xs text-[var(--text-secondary)]"
+        style={{ borderColor: 'var(--border)', background: 'var(--surface-1)' }}
+        role="note"
+      >
+        <strong>Nesta página o período é sempre pela data de criação</strong> — a janela
+        de 90 dias conta a partir da abertura da preventiva, então o controle de{' '}
+        <em>eixo da data</em> não se aplica aqui. A <em>granularidade</em> vale para o
+        volume; a série da taxa é sempre mensal, porque a reincidência de um único dia
+        oscila demais para ser lida. Os demais filtros valem normalmente.
       </p>
 
       {/* AVISO DE MATURIDADE.
@@ -139,35 +163,42 @@ export function PreventivosConteudo() {
         />
       </section>
 
-      {/* Volume mensal no topo, como no visual `PROTOCOLOS PREVENTIVOS ABERTOS
-          MÊS` do Power BI: antes de discutir qualidade, quanto se fez. */}
-      {d && d.porMes.length > 0 && (
+      {/* Volume no topo, como no visual `PROTOCOLOS PREVENTIVOS ABERTOS MÊS` do
+          Power BI: antes de discutir qualidade, quanto se fez.
+
+          Segue a granularidade da barra desde 14/09/2026 — o volume diário tem
+          sinal de verdade (em setembro/2026: 80 preventivas numa terça contra 1
+          num domingo), e antes o painel era mensal à força. Só o VOLUME segue a
+          granularidade; a série da TAXA, mais abaixo, continua mensal de
+          propósito — ver o comentário lá. */}
+      {d && d.porPeriodo.length > 0 && (
         <Painel
-          titulo="Preventivas abertas por mês"
-          descricao="Volume de protocolos preventivos criados — o tooltip traz a reincidência do mês"
+          titulo={`Preventivas abertas por ${GRANULARIDADES[filtros.granularidade].label.toLowerCase()}`}
+          descricao="Volume de protocolos preventivos criados — o tooltip traz a reincidência do período"
           carregando={q.isLoading}
           erro={erro}
           tabela={{
             colunas: [
-              { chave: 'mes', rotulo: 'Mês' },
+              { chave: 'periodo', rotulo: 'Período' },
               { chave: 'prev', rotulo: 'Preventivas', alinhar: 'dir' },
               { chave: 'reinc', rotulo: 'Reincidentes', alinhar: 'dir' },
               { chave: 'taxa', rotulo: 'Taxa', alinhar: 'dir' },
             ],
-            linhas: d.porMes.map((x) => ({
-              mes: x.mes,
+            linhas: d.porPeriodo.map((x) => ({
+              periodo: fmtPeriodo(x.periodo, filtros.granularidade),
               prev: fmtInt(x.preventivas),
               reinc: fmtInt(x.reincidentes),
               taxa: fmtFracaoPct(x.taxaReincidencia, 1),
             })),
           }}
         >
-          <ColunasMes
-            dados={d.porMes.map((x) => ({
-              mes: x.mes,
+          <ColunasPeriodo
+            dados={d.porPeriodo.map((x) => ({
+              periodo: x.periodo,
               valor: x.preventivas,
               detalhe: `${fmtInt(x.reincidentes)} reincidentes · taxa ${fmtFracaoPct(x.taxaReincidencia, 1)}`,
             }))}
+            granularidade={filtros.granularidade}
             unidade="preventivas"
             altura={210}
           />
@@ -299,6 +330,15 @@ export function PreventivosConteudo() {
         )}
       </Painel>
 
+      {/* SEMPRE MENSAL, qualquer que seja a granularidade escolhida — e isso é
+          deliberado, não um resto do painel antigo.
+
+          O volume lá em cima ganhou o balde do filtro porque volume diário tem
+          sinal. A TAXA não tem: em setembro/2026 foram ~15 reincidentes em 14
+          dias, cerca de um por dia. No domingo 13, com 1 preventiva no dia, a
+          taxa só podia dar 0% ou 100% — e pintaria de vermelho um dia que não
+          diz nada. A janela de reincidência é de 90 dias; o mês é a menor caixa
+          que a comporta. O título já diz "mês a mês", então a tela não mente. */}
       {d && d.porMes.length > 1 && (
         <Painel
           titulo="Reincidência mês a mês"
