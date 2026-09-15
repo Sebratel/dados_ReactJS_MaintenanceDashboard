@@ -298,6 +298,46 @@ export async function obterProdutividade(f: Filtros): Promise<ResultadoProdutivi
         FROM erp.v_service_desk_slots_productivity_informative v
        WHERE v.begin_date_slot >= ${de}::date
          AND v.begin_date_slot < (${ate}::date + interval '1 day')
+         /*
+          * ESTA TELA RECORTA POR TIPO; TODAS AS OUTRAS RECORTAM POR
+          * EQUIPE/CATALOGO. E DELIBERADO -- NAO E ESQUECIMENTO.
+          *
+          * A divergencia ficou aberta um mes como item A de docs/06, sob a
+          * suspeita de que o recorte por tipo deixava entrar trabalho que nao e
+          * manutencao. MEDIDA em jun-ago/2026 (15/09/2026), no grao de visita:
+          *
+          *   visitas hoje (por tipo) ................. 11.614
+          *   visitas no recorte por equipe/catalogo .. 11.606
+          *   sairiam ................................. 10   (0,086%)
+          *   entrariam ...............................  2
+          *
+          * NENHUMA das 10 sai por catalogo -- a suspeita original nao ocorre.
+          * Todas saem por EQUIPES_FORA_DA_MANUTENCAO, que esta tela nao
+          * aplica. E nao aplicar esta CERTO, porque as duas telas respondem
+          * perguntas diferentes:
+          *
+          *   - No MTTR, excluir COR/CGR/Suporte esta certo: enquanto o
+          *     protocolo esta com a central, o tempo medido e dela e nao do
+          *     campo (item M de docs/06).
+          *   - Aqui, quando um tecnico de campo VAI AO CLIENTE num protocolo do
+          *     COR, aquilo e producao DELE. Quem esta sendo medido e o tecnico,
+          *     nao o protocolo.
+          *
+          * As 10 foram conferidas relato a relato: deslocamento iniciado e
+          * encerrado, tecnico nomeado, motivo classificado (MAN.002 - IMPROD -
+          * REAGENDA CLI (COM VISITA), "cliente nao pode receber no momento").
+          * Sao improdutivas REAIS em base de Manutencao. Unificar apagaria
+          * trabalho que aconteceu, melhorando o indicador por enxergar menos.
+          *
+          * E pioraria pelo outro lado tambem: as 2 que ENTRARIAM sao do
+          * protocolo 1735660 (equipe Financeiro, tipo CX - ATENDIMENTO
+          * PRIORITARIO 72H), roteirizado para a trilha de ATIVACAO -- o mesmo
+          * que fez a "Base Sao Leopoldo (Ativacao)" aparecer no combo e que
+          * opcoes.ts tirou de la por nao pertencer a operacao.
+          *
+          * ⚠️ QUEM FOR "ARRUMAR" A FRAGMENTACAO DE UNIVERSO: esta tela e a
+          * excecao justificada, nao a pendencia. Medir de novo antes de mexer.
+          */
          AND v.incident_type_title = any(${tipos})
          ${filtroSlots}
        GROUP BY v.assignment_id, 3
