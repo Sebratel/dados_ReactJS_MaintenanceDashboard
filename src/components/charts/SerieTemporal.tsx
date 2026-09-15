@@ -31,7 +31,19 @@ export function SerieTemporal({
   const option = useMemo(() => {
     const tk = lerTokens()
     const rotulos = dados.map((d) => fmtPeriodo(d.periodo, granularidade))
-    const ultimo = dados.length - 1
+    /**
+     * O último ponto COM MEDIDA, e não o último do array.
+     *
+     * O rótulo impresso no fim da linha existe para dizer em quanto ela
+     * terminou. Desde 15/09/2026 (item D) período futuro vem `null`, e apontar
+     * para o fim do array escreveria o rótulo sobre o dia 30 de um mês que está
+     * no dia 15 — ou nada, dependendo de como o ECharts trata o nulo. Nos dois
+     * casos o número deixa de aparecer onde a linha realmente para.
+     */
+    const ultimo = dados.reduce(
+      (acc, d, i) => (d.abertos === null && d.encerrados === null ? acc : i),
+      -1
+    )
 
     const rotuloFinal = (cor: string) => ({
       show: true,
@@ -55,6 +67,14 @@ export function SerieTemporal({
           const i = ps[0]?.dataIndex ?? 0
           const d = dados[i]
           if (!d) return ''
+
+          // Com trigger 'axis' o tooltip abre mesmo onde não há ponto. Sem
+          // isto, passar o mouse pela parte vazia do mês mostrava
+          // "Criados —  Encerrados —", que parece dado faltando e não futuro.
+          if (d.abertos === null && d.encerrados === null) {
+            return `<b>${fmtPeriodo(d.periodo, granularidade)}</b><br/><span style="color:${tk.textMuted}">ainda não aconteceu</span>`
+          }
+
           const linhas = ps
             .map(
               (p) =>
@@ -65,12 +85,20 @@ export function SerieTemporal({
                  </div>`
             )
             .join('')
-          const cor = d.saldo > 0 ? tk.statusCritical : d.saldo < 0 ? tk.statusGood : tk.textMuted
-          const seta = d.saldo > 0 ? '▲' : d.saldo < 0 ? '▼' : '='
-          const saldo = `<div style="display:flex;gap:6px;margin-top:5px;padding-top:4px;border-top:1px solid ${tk.gridline}">
+          // Período futuro não tem saldo — a linha inteira sai do tooltip em
+          // vez de mostrar "= 0", que afirmaria equilíbrio onde não há medida.
+          const saldo =
+            d.saldo === null
+              ? ''
+              : (() => {
+                  const cor =
+                    d.saldo > 0 ? tk.statusCritical : d.saldo < 0 ? tk.statusGood : tk.textMuted
+                  const seta = d.saldo > 0 ? '▲' : d.saldo < 0 ? '▼' : '='
+                  return `<div style="display:flex;gap:6px;margin-top:5px;padding-top:4px;border-top:1px solid ${tk.gridline}">
               <span style="color:${tk.textSecondary}">Saldo do backlog</span>
               <b style="margin-left:auto;color:${cor}">${seta} ${d.saldo > 0 ? '+' : ''}${fmtInt(d.saldo)}</b>
             </div>`
+                })()
           return `<b>${fmtPeriodo(d.periodo, granularidade)}</b>${linhas}${saldo}`
         },
       }),
@@ -119,6 +147,9 @@ export function SerieTemporal({
           name: 'Criados',
           type: 'line',
           data: dados.map((d) => d.abertos),
+          // explícito porque é carga: período futuro vem null (item D) e a linha
+          // precisa PARAR ali, não saltar por cima do vazio até o fim do mês.
+          connectNulls: false,
           smooth: false,
           symbol: 'circle',
           symbolSize: MARCA.tamanhoMarcador,
@@ -132,6 +163,7 @@ export function SerieTemporal({
           name: 'Encerrados',
           type: 'line',
           data: dados.map((d) => d.encerrados),
+          connectNulls: false,
           smooth: false,
           symbol: 'circle',
           symbolSize: MARCA.tamanhoMarcador,

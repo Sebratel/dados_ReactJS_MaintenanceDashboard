@@ -34,7 +34,17 @@ export function PreventivosConteudo() {
   // do recorte, não o total geral de protocolos abertos (que inclui reparo,
   // ativação etc. e não bateria com o resto da página).
   const coef = useCoeficiente(filtros)
-  const baseClientes = coef.data?.data.at(-1)?.baseClientes ?? null
+  /**
+   * O ÚLTIMO DIA COM BASE MEDIDA, e não o último ponto da série.
+   *
+   * Desde 15/09/2026 (item D) dia futuro vem com `baseClientes: null`, então
+   * num recorte “mês corrente” o `.at(-1)` caía no dia 30 e este cartão
+   * mostrava “—” o mês inteiro. A base de clientes é um estoque: o valor
+   * conhecido mais recente é a melhor resposta para “quantos clientes temos”.
+   */
+  const baseClientes =
+    [...(coef.data?.data ?? [])].reverse().find((p) => p.baseClientes !== null)?.baseClientes ??
+    null
   const taxaEntrantes = t && baseClientes ? t.preventivas / baseClientes : null
 
   const tabelaDim = (linhas: NonNullable<typeof d>['porBase']) => ({

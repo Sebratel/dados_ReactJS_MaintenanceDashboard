@@ -3,14 +3,20 @@ import { STATUS_ENCERRADO } from '@/config/regras-negocio'
 import type { Filtros } from '@/lib/filtros'
 import { montarFrom, montarWhere, partesNecessarias, truncGranularidade } from './base'
 
+/**
+ * ⚠️ TUDO ANULÁVEL POR CAUSA DO FUTURO, e a diferença importa: `0` é uma
+ * AFIRMAÇÃO ("não houve nenhum"), `null` é a ausência de medida ("esse dia
+ * ainda não aconteceu"). Ver o comentário sobre `periodo > current_date` na
+ * consulta abaixo.
+ */
 export type PontoSerie = {
   periodo: string
-  /** protocolos CRIADOS no período (entrada) */
-  abertos: number
+  /** protocolos CRIADOS no período (entrada) — `null` em período futuro */
+  abertos: number | null
   /** protocolos ENCERRADOS no período (saída) — contados pela data de encerramento */
-  encerrados: number
+  encerrados: number | null
   /** saldo do fluxo: entrada − saída. Positivo = backlog crescendo. */
-  saldo: number
+  saldo: number | null
   /** MTTR médio dos protocolos encerrados no período */
   mttrHoras: number | null
 }
@@ -36,6 +42,10 @@ export type PontoSerie = {
  *
  * `generate_series` garante períodos sem movimento presentes com zero — sem
  * isso a linha "pula" o dia vazio e sugere continuidade que não existe.
+ *
+ * ⚠️ Com UMA exceção, e ela é o oposto: período no FUTURO vem `null`, não zero.
+ * Dia sem movimento é uma medida ("não houve nenhum"); dia que ainda não
+ * aconteceu não é medida nenhuma. Ver o comentário na cláusula final.
  */
 export async function obterSerie(f: Filtros): Promise<{
   data: PontoSerie[]
@@ -79,9 +89,28 @@ export async function obterSerie(f: Filtros): Promise<{
         AND a.conclusion_date < ($${iAte}::date + interval '1 day')
       GROUP BY 1
     )
-    SELECT c.periodo::text            AS periodo,
-           coalesce(e.n, 0)           AS abertos,
-           coalesce(s.n, 0)           AS encerrados,
+    /*
+     * PERÍODO FUTURO VEM NULO, NÃO ZERO.
+     *
+     * Num recorte que alcança o futuro — "mês corrente" no dia 15 vai até o dia
+     * 30 — o LEFT JOIN não acha linha para os dias que ainda não aconteceram,
+     * e o coalesce(…, 0) que estava aqui os desenhava como zero. A linha
+     * despencava no meio do gráfico e lia como operação parando; quem olhasse a
+     * ponta direita via uma queda que não existiu.
+     *
+     * Zero é uma AFIRMAÇÃO — "não houve nenhum". Null é ausência de medida. O
+     * eixo continua indo até o fim do recorte (a pessoa vê quanto do mês já
+     * correu), mas o traço para em hoje. É o que o Power BI da Manutenção
+     * sempre fez, e foi a decisão dela em 15/09/2026 (item D de docs/06).
+     *
+     * c.periodo > current_date e não >=: o balde é datado pelo INÍCIO, então
+     * a semana que começou dia 14 e o mês que começou dia 1 são o período
+     * CORRENTE — parciais, mas medidos. Só some o balde que começa depois de
+     * hoje.
+     */
+    SELECT c.periodo::text AS periodo,
+           CASE WHEN c.periodo > current_date THEN NULL ELSE coalesce(e.n, 0) END AS abertos,
+           CASE WHEN c.periodo > current_date THEN NULL ELSE coalesce(s.n, 0) END AS encerrados,
            s.mttr_h                   AS mttr_h
       FROM calendario c
       LEFT JOIN entradas e ON e.periodo = c.periodo
@@ -91,8 +120,8 @@ export async function obterSerie(f: Filtros): Promise<{
 
   const r = await consultarErp<{
     periodo: string
-    abertos: number
-    encerrados: number
+    abertos: number | null
+    encerrados: number | null
     mttr_h: number | null
   }>(sql, w.params)
 
@@ -100,7 +129,10 @@ export async function obterSerie(f: Filtros): Promise<{
     periodo: x.periodo,
     abertos: x.abertos,
     encerrados: x.encerrados,
-    saldo: x.abertos - x.encerrados,
+    // sem as duas pontas não há saldo — `null - null` daria 0 em JS, que é
+    // exatamente a afirmação falsa ("entrou tanto quanto saiu") que este item
+    // veio tirar da tela.
+    saldo: x.abertos === null || x.encerrados === null ? null : x.abertos - x.encerrados,
     mttrHoras: x.mttr_h,
   }))
 
@@ -108,8 +140,11 @@ export async function obterSerie(f: Filtros): Promise<{
     ms: r.ms,
     meta: {
       eixoDuplo: true,
-      totalAbertos: data.reduce((s, d) => s + d.abertos, 0),
-      totalEncerrados: data.reduce((s, d) => s + d.encerrados, 0),
+      // `?? 0` nos totais: período futuro não soma nada, e o total continua
+      // sendo o que de fato aconteceu no recorte. Aqui somar zero é correto —
+      // é no GRÁFICO que zero mentiria, porque lá ele vira um ponto desenhado.
+      totalAbertos: data.reduce((s, d) => s + (d.abertos ?? 0), 0),
+      totalEncerrados: data.reduce((s, d) => s + (d.encerrados ?? 0), 0),
     },
     data,
   }

@@ -7,12 +7,24 @@ import { montarFrom, montarWhere, partesNecessarias } from './base'
 
 export type PontoCoeficiente = {
   dia: string
-  reparos: number
+  /** `null` em dia futuro — ver `futuro` abaixo */
+  reparos: number | null
   baseClientes: number | null
   coeficiente: number | null
   meta: number
   /** true quando a base do dia veio do último snapshot conhecido (LOCF) */
   interpolado: boolean
+  /**
+   * Dia posterior a hoje, dentro de um recorte que alcança o futuro.
+   *
+   * SEPARADO DE `interpolado` DE PROPÓSITO, e a distinção não é acadêmica: sem
+   * ela, todo dia futuro caía em `interpolado` — porque o Data Hub realmente
+   * não tem base para amanhã — e o Executivo anunciava "16 dias com base
+   * estimada" num mês em que nenhum dia estava estimado de verdade. O aviso
+   * existe para denunciar buraco no Data Hub; enchê-lo de dias que ainda não
+   * aconteceram o tornava ruído e escondia o buraco real.
+   */
+  futuro: boolean
 }
 
 /**
@@ -85,9 +97,40 @@ export async function obterCoeficiente(f: Filtros): Promise<{
     baseMap.set(String(r.dia).slice(0, 10), Number(r.clientes))
   }
 
+  // Hoje em ISO pelo relógio do SERVIDOR, que é o mesmo fuso do banco
+  // (America/Sao_Paulo no container). Comparação de string funciona porque
+  // 'YYYY-MM-DD' ordena lexicograficamente igual à data.
+  const agora = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const hojeIso = `${agora.getFullYear()}-${pad(agora.getMonth() + 1)}-${pad(agora.getDate())}`
+
   let ultimoConhecido: number | null = null
   let diasInterpolados = 0
   const data: PontoCoeficiente[] = rReparos.rows.map((r) => {
+    const dow = new Date(`${r.dia}T00:00:00Z`).getUTCDay()
+
+    /*
+     * DIA QUE AINDA NÃO ACONTECEU NÃO É MEDIDA NENHUMA.
+     *
+     * Antes ele vinha com `reparos: 0` e entrava no LOCF como se fosse um
+     * buraco do Data Hub. Resultado: o gráfico caía a zero na ponta direita e
+     * o aviso contava dias futuros como "base estimada". Decisão da Manutenção
+     * em 15/09/2026 (item D de docs/06): o eixo vai até o fim do recorte, o
+     * traço para em hoje. Sai do LOCF também — interpolar para a frente seria
+     * projeção, e projeção foi recusada por ler como medição.
+     */
+    if (r.dia > hojeIso) {
+      return {
+        dia: r.dia,
+        reparos: null,
+        baseClientes: null,
+        coeficiente: null,
+        meta: META_COEFICIENTE[dow] ?? 0.0012,
+        interpolado: false,
+        futuro: true,
+      }
+    }
+
     const medido = baseMap.get(r.dia) ?? null
     let interpolado = false
     if (medido !== null) {
@@ -97,7 +140,6 @@ export async function obterCoeficiente(f: Filtros): Promise<{
       diasInterpolados++
     }
     const base = medido ?? ultimoConhecido
-    const dow = new Date(`${r.dia}T00:00:00Z`).getUTCDay()
     return {
       dia: r.dia,
       reparos: r.reparos,
@@ -105,6 +147,7 @@ export async function obterCoeficiente(f: Filtros): Promise<{
       coeficiente: base ? r.reparos / base : null,
       meta: META_COEFICIENTE[dow] ?? 0.0012,
       interpolado,
+      futuro: false,
     }
   })
 

@@ -39,7 +39,17 @@ export function VisaoExecutivaConteudo() {
   // Base de clientes no fim do período: reaproveita o último ponto de `coef`
   // (já carregado para o painel de coeficiente) em vez de repetir a consulta
   // ao MariaDB só para este card.
-  const baseClientes = coef.data?.data.at(-1)?.baseClientes ?? null
+  /**
+   * O ÚLTIMO DIA COM BASE MEDIDA, e não o último ponto da série.
+   *
+   * Desde 15/09/2026 (item D) dia futuro vem com `baseClientes: null`, então
+   * num recorte “mês corrente” o `.at(-1)` caía no dia 30 e este cartão
+   * mostrava “—” o mês inteiro. A base de clientes é um estoque: o valor
+   * conhecido mais recente é a melhor resposta para “quantos clientes temos”.
+   */
+  const baseClientes =
+    [...(coef.data?.data ?? [])].reverse().find((p) => p.baseClientes !== null)?.baseClientes ??
+    null
   const taxaEntrantes = k && baseClientes ? k.protocolos / baseClientes : null
 
   return (
@@ -139,7 +149,7 @@ export function VisaoExecutivaConteudo() {
                 periodo: fmtPeriodo(d.periodo, filtros.granularidade),
                 abertos: fmtInt(d.abertos),
                 encerrados: fmtInt(d.encerrados),
-                saldo: `${d.saldo > 0 ? '+' : ''}${fmtInt(d.saldo)}`,
+                saldo: d.saldo === null ? fmtInt(null) : `${d.saldo > 0 ? '+' : ''}${fmtInt(d.saldo)}`,
                 mttr: fmtHoras(d.mttrHoras),
               })),
             }}
@@ -247,7 +257,9 @@ export function VisaoExecutivaConteudo() {
             base: fmtInt(d.baseClientes),
             coef: fmtFracaoPct(d.coeficiente, 3),
             meta: fmtFracaoPct(d.meta, 3),
-            obs: d.interpolado ? 'base estimada' : '',
+            // "ainda não aconteceu" e "base estimada" são coisas diferentes, e
+            // até 15/09/2026 as duas apareciam como estimada — ver item D.
+            obs: d.futuro ? 'ainda não aconteceu' : d.interpolado ? 'base estimada' : '',
           })),
         }}
       >

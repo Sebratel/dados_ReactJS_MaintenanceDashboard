@@ -44,7 +44,8 @@ export function OperacaoConteudo() {
             periodo: fmtPeriodo(d.periodo, filtros.granularidade),
             abertos: fmtInt(d.abertos),
             encerrados: fmtInt(d.encerrados),
-            saldo: fmtInt(d.abertos - d.encerrados),
+            // futuro não tem saldo: fmtInt(null) já escreve “—”
+            saldo: fmtInt(d.abertos === null || d.encerrados === null ? null : d.abertos - d.encerrados),
           })),
         }}
       >
