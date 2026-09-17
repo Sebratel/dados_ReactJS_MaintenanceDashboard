@@ -4,6 +4,7 @@ import {
   CATEGORIAS_PREVENTIVAS,
   CLIENTES_TESTE,
   EQUIPES_FORA_DA_MANUTENCAO,
+  STATUS_CANCELADO,
   TIPOS_FORA_DA_MANUTENCAO,
   TIPOS_PREVENTIVOS,
 } from '@/config/regras-negocio'
@@ -227,6 +228,62 @@ export async function obterPreventivos(f: Filtros): Promise<ResultadoPreventivos
   const tipoValido = f.tipo?.filter((t) => (TIPOS_PREVENTIVOS as readonly string[]).includes(t))
   const filtroTipo = tipoValido?.length ? `AND tipo = any(${p(tipoValido)}::text[])` : ''
 
+  // ── OS QUATRO FILTROS QUE A BARRA MOSTRAVA E A CONSULTA IGNORAVA ──────────
+  //
+  // Catalogo, Equipe, Status e Tecnico existem no combo desde sempre; ate
+  // 17/09/2026 nenhum deles chegava ao SQL. A pessoa selecionava, a URL mudava,
+  // a consulta rodava de novo e devolvia o MESMO numero. Isso e pior que filtro
+  // quebrado: a tela responde com autoridade a uma pergunta que nao foi feita, e
+  // quem le acha que isolou um tecnico quando esta vendo a equipe inteira.
+  //
+  // Medido no ano corrente (17/09/2026), com os dois tipos preventivos:
+  //   Oper. Tecnologia .... devia dar    583 preventivas a 10,5%; dava 5.459 a 9,8%
+  //   Oper. Reparo ........ devia dar  4.877 preventivas a  9,7%; dava 5.459 a 9,8%
+  //   Suporte (24 Horas) .. devia dar      0 (nao e catalogo de manutencao)
+  //   Status Agendado ..... devia dar     66 a 0,0% -- nem aconteceram ainda
+  //   Tecnico ............. separa gente que varia de 5,4% a 13,9%
+  //
+  // ⚠️ TODOS ENTRAM EM classificado, NUNCA EM universo. A razao esta documentada
+  // no proprio WHERE la embaixo: universo tambem e a fonte dos REPAROS que
+  // invalidam a preventiva, e estreita-lo apagaria retornos do lookup -- a taxa
+  // de reincidencia MELHORARIA por enxergar menos, sem nenhum erro na tela.
+  //
+  // O saneamento de catalogo espelha o de tipo, e pela mesma razao: o combo da
+  // barra oferece catalogos de fora da manutencao (Suporte, Equipe ativacao), e
+  // um deles vindo pela URL nunca casaria com nenhuma linha -- a tela zeraria em
+  // silencio, indistinguivel de "nao houve preventiva no periodo".
+  const catalogoValido = f.catalogo?.filter((c) =>
+    (CATALOGOS_MANUTENCAO as readonly string[]).includes(c)
+  )
+  const filtroCatalogo = catalogoValido?.length
+    ? `AND catalogo = any(${p(catalogoValido)}::text[])`
+    : ''
+  const filtroEquipe = f.equipe?.length ? `AND equipe = any(${p(f.equipe)}::text[])` : ''
+  const filtroStatus = f.status?.length ? `AND status = any(${p(f.status)}::text[])` : ''
+  /**
+   * TECNICO AQUI E O EXECUTOR DA AGENDA, nao o responsavel do protocolo.
+   *
+   * `montarWhere` (base.ts) filtra por `resp.name`; esta tela ranqueia por
+   * executor -- a coluna `tecnico` vem do LATERAL `v2`, "quem atendeu a
+   * preventiva". Filtrar por responsavel faria o combo discordar do painel logo
+   * abaixo dele: escolher um nome do ranking podia devolver zero.
+   *
+   * O combo ja atende os dois graos -- `opcoes.ts` une responsaveis ∪
+   * executores exatamente por isto. Divergencia registrada em docs/06.
+   */
+  const filtroTecnico = f.tecnico?.length ? `AND tecnico = any(${p(f.tecnico)}::text[])` : ''
+
+  /**
+   * CANCELADO SAI DO UNIVERSO -- a menos que a pessoa peca por ele, mesma regra
+   * de `montarWhere`. A suspensao aqui e mais larga de proposito: com Cancelado
+   * selecionado o protocolo cancelado volta ao `universo`, e la ele serve TAMBEM
+   * de reparo posterior. E o preco de conseguir auditar preventiva cancelada em
+   * algum lugar; com a barra limpa, nada muda.
+   */
+  const filtroCancelado = f.status?.includes(STATUS_CANCELADO)
+    ? ''
+    : `AND coalesce(st.title, '') <> '${STATUS_CANCELADO}'`
+
   const cond: string[] = []
   if (f.base) cond.push(`ag.regiao = any(${p(f.base)}::text[])`)
   if (f.cidade) cond.push(`pe.city = any(${p(f.cidade)}::text[])`)
@@ -255,6 +312,11 @@ export async function obterPreventivos(f: Filtros): Promise<ResultadoPreventivos
              cat2.title AS categoria,
              coalesce(it.title, '') AS tipo,
              ai.team_id,
+             -- Carregadas so para o WHERE de classificado; nao entram no SELECT
+             -- final nem viram dimensao. Ver o bloco dos quatro filtros acima.
+             cs.title AS catalogo,
+             tm.title AS equipe,
+             coalesce(st.title, '') AS status,
              (it.title = any(${tiposPrev}) OR cat2.title = any(${catsPrev})) AS eh_preventiva,
              max(v2.region_title) OVER (PARTITION BY a.id) AS base_agenda,
              v2.executor AS tecnico
@@ -263,6 +325,7 @@ export async function obterPreventivos(f: Filtros): Promise<ResultadoPreventivos
         LEFT JOIN erp.incident_status st  ON st.id = ai.incident_status_id
         LEFT JOIN erp.incident_types it   ON it.id = ai.incident_type_id
         LEFT JOIN erp.catalog_services cs ON cs.id = ai.catalog_service_id
+        LEFT JOIN erp.teams tm            ON tm.id = ai.team_id
         LEFT JOIN erp.people pe           ON pe.id = a.requestor_id
         LEFT JOIN erp.solicitation_category_matrices scm ON scm.id = ai.solicitation_category_matrix_id
         LEFT JOIN erp.solicitation_service_categories cat2 ON cat2.id = scm.service_category_id_2
@@ -312,7 +375,7 @@ export async function obterPreventivos(f: Filtros): Promise<ResultadoPreventivos
        WHERE a.created >= ${de}::date
          AND a.created < (${ate}::date + interval '91 days')
          AND cs.title = any(${catalogos})
-         AND coalesce(st.title, '') <> 'Cancelado'
+         ${filtroCancelado}
          -- ⚠️ SEM FILTRO DE CIDADE, de propósito -- decisão da Manutenção em
          -- 02/09/2026: "libera na origem todas as cidades, se precisar análise
          -- faz o filtro e reduz o que interessa". Até aqui só esta tela
@@ -393,6 +456,10 @@ export async function obterPreventivos(f: Filtros): Promise<ResultadoPreventivos
          AND tipo <> all(${tiposFora})
          AND coalesce(team_id, -1) <> all(${equipesFora})
          ${filtroTipo}
+         ${filtroCatalogo}
+         ${filtroEquipe}
+         ${filtroStatus}
+         ${filtroTecnico}
     )
     SELECT mes, periodo::text AS periodo, base, cidade, categoria, tecnico, classe, recente,
            count(*)::int AS preventivas

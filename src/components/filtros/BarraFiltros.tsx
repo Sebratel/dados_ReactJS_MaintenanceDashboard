@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { STATUS_CANCELADO, TIPOS_PREVENTIVOS } from '@/config/regras-negocio'
+import { CATALOGOS_MANUTENCAO, STATUS_CANCELADO, TIPOS_PREVENTIVOS } from '@/config/regras-negocio'
 import { EIXOS_DATA, GRANULARIDADES, parsearFiltros, presetsPeriodo, type Filtros } from '@/lib/filtros'
 import { fmtData } from '@/lib/formato'
 import { useOpcoesFiltro } from '@/lib/useIndicador'
@@ -61,6 +61,19 @@ export function BarraFiltros() {
     pathname === '/preventivos' ? TIPOS_PREVENTIVOS : null
 
   /**
+   * O MESMO, PARA CATÁLOGO — e pela mesma razão exata.
+   *
+   * O combo listava os oito catálogos que existem na base (Suporte 24h, Suporte
+   * 72h, Suporte Tecnico, Equipe ativação…), mas o universo de Preventivos só
+   * contém os quatro de manutenção. Enquanto o filtro era ignorado pelo backend
+   * isso não aparecia: escolher "Suporte (24 Horas)" devolvia as 5.459
+   * preventivas do recorte inteiro. Com o filtro funcionando (17/09/2026), a
+   * mesma escolha zeraria a tela em silêncio — quatro das oito opções.
+   */
+  const catalogosPermitidos: readonly string[] | null =
+    pathname === '/preventivos' ? CATALOGOS_MANUTENCAO : null
+
+  /**
    * SANEAMENTO DA URL, não só da lista exibida.
    *
    * O filtro acima (`tiposPermitidos`) só tira as opções erradas do combo —
@@ -73,10 +86,20 @@ export function BarraFiltros() {
    * barra precisa refletir isso na URL, senão o combo mente "2 selec.".
    */
   useEffect(() => {
-    if (!tiposPermitidos || !filtros.tipo?.length) return
-    const valido = filtros.tipo.filter((t) => tiposPermitidos.includes(t))
-    if (valido.length !== filtros.tipo.length) aplicar({ tipo: valido })
-  }, [tiposPermitidos, filtros.tipo, aplicar])
+    // Um patch só, e não uma chamada por campo: `aplicar` monta a URL a partir
+    // do `sp` desta renderização, então duas chamadas seguidas fariam a segunda
+    // sobrescrever a primeira — a poda de um dos dois campos se perderia.
+    const patch: Record<string, string[]> = {}
+    const podar = (chave: 'tipo' | 'catalogo', permitidos: readonly string[] | null) => {
+      const atual = filtros[chave]
+      if (!permitidos || !atual?.length) return
+      const valido = atual.filter((v) => permitidos.includes(v))
+      if (valido.length !== atual.length) patch[chave] = valido
+    }
+    podar('tipo', tiposPermitidos)
+    podar('catalogo', catalogosPermitidos)
+    if (Object.keys(patch).length) aplicar(patch)
+  }, [tiposPermitidos, catalogosPermitidos, filtros.tipo, filtros.catalogo, aplicar])
 
   /**
    * A BARRA SÓ EXISTE NAS TELAS DE DADOS, E QUEM DECIDE É ESTE COMPONENTE.
@@ -214,6 +237,8 @@ export function BarraFiltros() {
           let lista = opcoes?.[c.chave] ?? []
           if (c.chave === 'tipo' && tiposPermitidos)
             lista = lista.filter((v) => tiposPermitidos.includes(v))
+          if (c.chave === 'catalogo' && catalogosPermitidos)
+            lista = lista.filter((v) => catalogosPermitidos.includes(v))
           return (
             <Dropdown
               key={c.chave}
