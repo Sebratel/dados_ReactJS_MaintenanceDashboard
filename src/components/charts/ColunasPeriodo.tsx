@@ -2,7 +2,14 @@
 
 import { useMemo } from 'react'
 import { Chart } from './Chart'
-import { lerTokens, baseEixoCategoria, baseEixoValor, baseGrid, baseTooltip } from '@/lib/tema'
+import {
+  lerTokens,
+  baseEixoCategoria,
+  baseEixoValor,
+  baseGrid,
+  baseTooltip,
+  rotuloValor,
+} from '@/lib/tema'
 import { fmtInt, fmtPeriodo } from '@/lib/formato'
 import type { Granularidade } from '@/lib/filtros'
 
@@ -47,27 +54,6 @@ export function ColunasPeriodo({
     const tk = lerTokens()
     const rotulos = dados.map((d) => fmtPeriodo(d.periodo, granularidade))
 
-    /**
-     * QUEM DECIDE SE O RÓTULO CABE É O ECHARTS, NÃO UMA CONTAGEM ESCOLHIDA A MÃO.
-     *
-     * Antes era `dados.length <= 16`, calibrado para 12 meses ou as 13 semanas de
-     * um trimestre. No recorte "Ano corrente" a série semanal tem 38 colunas e
-     * perdia os rótulos — mas elas CABIAM: 38 colunas em ~1.900 px dão 50 px
-     * cada, e "325" a 11 px ocupa uns 20. A Manutenção notou em 17/09/2026,
-     * comparando o gráfico mensal (rotulado) com o semanal (sem rótulo nenhum).
-     *
-     * Contagem fixa erra nas duas direções, porque ignora a LARGURA: numa janela
-     * estreita até 16 meses viram borrão, e o código não percebe. `hideOverlap`
-     * mede o texto e esconde só o que colidiria de verdade, então o rótulo
-     * aparece quando cabe e some quando não cabe — inclusive ao redimensionar.
-     *
-     * O TETO CONTINUA EXISTINDO, e é para o diário. Com 260 colunas o
-     * `hideOverlap` deixaria passar um rótulo a cada três, e um subconjunto
-     * espalhado parece escolha arbitrária — pior que rótulo nenhum. 60 cobre o
-     * ano inteiro de semanas (53) e o mês inteiro de dias (31); acima disso o
-     * valor fica no tooltip e na aba Tabela, como sempre esteve.
-     */
-    const cabemRotulos = dados.length <= 60
 
     return {
       grid: baseGrid(tk, { top: 24, bottom: 4, left: 4, right: 4 }),
@@ -93,15 +79,11 @@ export function ColunasPeriodo({
             borderRadius: [3, 3, 0, 0] as [number, number, number, number],
           },
           barMaxWidth: 46,
-          label: {
-            show: cabemRotulos,
-            position: 'top' as const,
-            formatter: (p: { value: number }) => fmtInt(p.value),
-            color: tk.textSecondary,
-            fontSize: 11,
-            fontWeight: 600 as const,
-          },
-          labelLayout: { hideOverlap: true },
+          ...rotuloValor({
+            n: dados.length,
+            formatter: (p) => fmtInt(p.value),
+            cor: tk.textSecondary,
+          }),
         },
       ],
     }

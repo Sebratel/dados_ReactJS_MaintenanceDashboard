@@ -2,7 +2,15 @@
 
 import { useMemo } from 'react'
 import { Chart } from './Chart'
-import { lerTokens, MARCA, baseEixoCategoria, baseEixoValor, baseGrid, baseTooltip } from '@/lib/tema'
+import {
+  lerTokens,
+  MARCA,
+  baseEixoCategoria,
+  baseEixoValor,
+  baseGrid,
+  baseTooltip,
+  rotuloValor,
+} from '@/lib/tema'
 import { fmtFracaoPct, fmtInt, fmtDiaCurto, fmtData } from '@/lib/formato'
 import type { PontoCoeficiente } from '@/server/indicadores/coeficiente'
 
@@ -79,6 +87,25 @@ export function CoeficienteVsMeta({
           })),
           barMaxWidth: 22,
           barCategoryGap: '30%',
+          /**
+           * DUAS CASAS, e não as três do tooltip.
+           *
+           * O coeficiente vive na terceira casa (0,118% contra 0,123%), então a
+           * precisão importa de verdade aqui — mas "0,123%" ocupa ~42 px contra
+           * ~32 px de "0,12%", e num recorte mensal essa diferença é a que faz o
+           * `hideOverlap` derrubar metade dos rótulos. A leitura na tela é
+           * "passou da meta ou não", que duas casas resolvem; a terceira
+           * continua no tooltip, junto com reparos e base de clientes.
+           *
+           * Só a série da barra rotula. A Meta é uma linha de referência em
+           * degraus e imprimir o valor dela em cada dia repetiria o mesmo número
+           * dezenas de vezes.
+           */
+          ...rotuloValor({
+            n: dados.length,
+            formatter: (p) => (p.value === null ? '' : fmtFracaoPct(p.value, 2)),
+            cor: tk.textSecondary,
+          }),
         },
         {
           // a meta varia por dia da semana (0,12% seg–sex · 0,08% sáb · 0,06% dom)

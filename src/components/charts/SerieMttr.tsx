@@ -2,7 +2,15 @@
 
 import { useMemo } from 'react'
 import { Chart } from './Chart'
-import { lerTokens, MARCA, baseEixoCategoria, baseEixoValor, baseGrid, baseTooltip } from '@/lib/tema'
+import {
+  lerTokens,
+  MARCA,
+  baseEixoCategoria,
+  baseEixoValor,
+  baseGrid,
+  baseTooltip,
+  rotuloValor,
+} from '@/lib/tema'
 import { fmtHoras, fmtHorasCurto, fmtPeriodo } from '@/lib/formato'
 import type { PontoSerie } from '@/server/indicadores/serie'
 import type { Granularidade } from '@/lib/filtros'
@@ -59,7 +67,31 @@ export function SerieMttr({
         {
           name: 'MTTR',
           type: 'line',
-          data: dados.map((d) => d.mttrHoras),
+          /**
+           * ANCORAGEM DAS PONTAS — sem isto o primeiro rótulo invade o eixo Y.
+           *
+           * Este gráfico usa `boundaryGap: false`, então o primeiro ponto nasce
+           * EM CIMA da linha do eixo. Com `position: 'top'` o rótulo é centrado
+           * nele e metade do texto cai fora da área de plotagem, por cima do
+           * rótulo do eixo — em 17/09/2026, num teste renderizado, "20h" e
+           * "15,6h" saíram sobrepostos como "20₁5,6h".
+           *
+           * `hideOverlap` não pega este caso: ele resolve colisão ENTRE rótulos
+           * de série, e o rótulo do eixo não participa desse layout.
+           *
+           * Alinhar a primeira à esquerda e a última à direita empurra as duas
+           * para dentro. Só as pontas precisam: o miolo tem vizinho dos dois
+           * lados e fica centrado, que é a leitura correta.
+           */
+          data: dados.map((d, i) => ({
+            value: d.mttrHoras,
+            label:
+              i === 0
+                ? { align: 'left' as const }
+                : i === dados.length - 1
+                  ? { align: 'right' as const }
+                  : undefined,
+          })),
           connectNulls: false,
           smooth: false,
           symbol: 'circle',
@@ -68,6 +100,20 @@ export function SerieMttr({
           lineStyle: { width: MARCA.larguraLinha, color: tk.series[1] },
           itemStyle: { color: tk.series[1], borderColor: tk.surface, borderWidth: 2 },
           areaStyle: { color: `${tk.series[1]}14` },
+          /**
+           * Série ÚNICA — por isso o rótulo por ponto é seguro aqui, e não em
+           * `SerieTemporal`, onde duas linhas dividem o eixo e os números de uma
+           * cairiam sobre a outra.
+           *
+           * `fmtHorasCurto` e não `fmtHoras`: "18,2h" ocupa ~30 px, enquanto
+           * "18h 12min" ocupa o dobro e faria o `hideOverlap` derrubar metade
+           * dos pontos num recorte mensal. A forma longa continua no tooltip.
+           */
+          ...rotuloValor({
+            n: dados.length,
+            formatter: (p) => (p.value === null ? '' : fmtHorasCurto(p.value)),
+            cor: tk.textSecondary,
+          }),
           markLine:
             media === null
               ? undefined

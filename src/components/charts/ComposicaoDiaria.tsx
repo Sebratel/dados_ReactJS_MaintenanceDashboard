@@ -9,6 +9,7 @@ import {
   baseEixoValor,
   baseGrid,
   baseTooltip,
+  rotuloValor,
 } from '@/lib/tema'
 import { fmtDiaCurto, fmtFracaoPct, fmtInt } from '@/lib/formato'
 import type { PontoProdutividadeDia } from '@/server/indicadores/produtividade'
@@ -56,6 +57,25 @@ export function ComposicaoDiaria({
         borderWidth: MARCA.vaoSuperficie / 2,
       },
       emphasis: { focus: 'series' as const },
+      /**
+       * O RÓTULO VAI SÓ NO SEGMENTO DO TOPO, E IMPRIME O TOTAL DA PILHA.
+       *
+       * Rotular cada fatia seria ilegível: num dia típico a verde tem 170 e as
+       * outras duas somam 8 — o número não cabe dentro de um segmento de 4 px, e
+       * três rótulos empilhados na mesma coluna colidem entre si.
+       *
+       * O total, sim, é a informação que o próprio subtítulo do painel promete
+       * ("Total da barra = visitas do dia"), e até 17/09/2026 só existia no
+       * tooltip. Ele sai de `d.totalVisitas` e não da soma das três séries: o
+       * `value` que o ECharts entrega aqui é o da fatia âmbar, não o da pilha.
+       */
+      ...(ehTopo
+        ? rotuloValor({
+            n: dados.length,
+            formatter: (p) => fmtInt(dados[p.dataIndex]?.totalVisitas ?? 0),
+            cor: tk.textSecondary,
+          })
+        : {}),
     })
 
     return {

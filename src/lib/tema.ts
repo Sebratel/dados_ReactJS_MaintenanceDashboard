@@ -104,6 +104,64 @@ export function baseEixoValor(tk: TokensTema, extra?: Record<string, unknown>) {
   }
 }
 
+/**
+ * Rótulo de valor impresso no próprio dado (topo da barra, acima do ponto).
+ *
+ * ── POR QUE UM HELPER, E NÃO UM `label` em cada gráfico ───────────────────
+ *
+ * Cada gráfico decidia sozinho, com uma contagem escolhida a olho: o
+ * `ColunasPeriodo` usava `<= 16`, o `SerieAssertividade` usa `<= 40` para
+ * outra coisa, e o resto simplesmente não rotulava. O resultado é o que a
+ * Manutenção viu em 17/09/2026 — o mesmo painel em três grãos, rotulado no
+ * mensal e mudo no semanal, sem nada que explicasse a diferença.
+ *
+ * ── CONTAGEM NÃO RESPONDE A PERGUNTA CERTA ────────────────────────────────
+ *
+ * "Cabe?" depende da LARGURA disponível e do TAMANHO DO TEXTO, não da
+ * quantidade de pontos. 38 semanas num monitor largo cabem; 16 meses numa
+ * janela estreita não. `hideOverlap` mede o texto já renderizado e esconde só
+ * o que colidiria — acerta nos dois casos, e continua acertando quando a
+ * pessoa redimensiona a janela.
+ *
+ * ── O TETO CONTINUA EXISTINDO, E É PARA O DIÁRIO LONGO ────────────────────
+ *
+ * Com 260 colunas o `hideOverlap` deixaria passar um rótulo a cada três, e um
+ * subconjunto espalhado parece escolha arbitrária — pior que rótulo nenhum.
+ * `maximo` é esse teto. O padrão, 60, cobre o ano inteiro de semanas (53) e o
+ * mês inteiro de dias (31).
+ *
+ * ⚠️ NÃO USAR EM SÉRIE SOBREPOSTA. Com duas linhas no mesmo eixo o rótulo de
+ * uma cai em cima da outra, e `hideOverlap` resolve a colisão escondendo um
+ * dos dois — o gráfico passa a mostrar números que aparecem e somem conforme
+ * o zoom. `SerieTemporal` rotula só o último ponto de cada série por isso.
+ */
+export function rotuloValor({
+  n,
+  formatter,
+  cor,
+  maximo = 60,
+  position = 'top',
+}: {
+  /** quantos pontos a série tem */
+  n: number
+  formatter: (p: { value: number | null; dataIndex: number }) => string
+  cor: string
+  maximo?: number
+  position?: 'top' | 'inside'
+}) {
+  return {
+    label: {
+      show: n <= maximo,
+      position,
+      formatter,
+      color: cor,
+      fontSize: 11,
+      fontWeight: 600 as const,
+    },
+    labelLayout: { hideOverlap: true },
+  }
+}
+
 export function baseTooltip(tk: TokensTema, extra?: Record<string, unknown>) {
   return {
     backgroundColor: tk.surface,

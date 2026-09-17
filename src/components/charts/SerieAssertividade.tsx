@@ -9,6 +9,7 @@ import {
   baseEixoValor,
   baseGrid,
   baseTooltip,
+  rotuloValor,
 } from '@/lib/tema'
 import { fmtDiaCurto, fmtFracaoPct, fmtInt } from '@/lib/formato'
 import type { PontoProdutividadeDia } from '@/server/indicadores/produtividade'
@@ -89,6 +90,14 @@ export function SerieAssertividade({
           lineStyle: { color: tk.series[0], width: MARCA.larguraLinha },
           itemStyle: { color: tk.series[0] },
           areaStyle: { color: `${tk.series[0]}14` },
+          // Série única, mesma justificativa de SerieMttr. Sem casa decimal:
+          // "96%" ocupa metade de "96,4%", e a variação que interessa no painel
+          // é de pontos inteiros -- a decimal fica no tooltip.
+          ...rotuloValor({
+            n: dados.length,
+            formatter: (p) => (p.value === null ? '' : fmtFracaoPct(p.value, 0)),
+            cor: tk.textSecondary,
+          }),
           markLine: media
             ? {
                 silent: true,
