@@ -406,6 +406,26 @@ export const TIPOS_FORA_DA_RECORRENCIA = [
  * por equipe/catálogo) — resolvido tipo a tipo, à medida que a Manutenção
  * confirma o que cada um significa, em vez de uma troca em bloco para
  * equipe/catálogo que ninguém validou ainda.
+ *
+ * ⚠️ `TEC-MANUT-ACESSO-CLI-INTENCAO-CANCELAMENTO` ACRESCENTADO 09/10/2026, a
+ * pedido da Manutenção. Tipo NOVO: a primeira ocorrência é de setembro/2026.
+ *
+ * É o caso do item A acontecendo de novo, e em tempo real. Como o universo das
+ * outras telas é catálogo + equipe, e tipo só sai por LISTA DE EXCLUSÃO
+ * (`TIPOS_FORA_DA_MANUTENCAO`), o tipo nasceu já contado em Executivo,
+ * Operação, Tempos, Recorrência, Ofensores e Protocolos — sem ninguém mexer em
+ * nada. A Produtividade, que recorta por lista de PERMISSÃO, foi a única a
+ * ignorá-lo. Um tipo novo entra sozinho em seis telas e some numa só.
+ *
+ * Não é perda teórica. Medido em setembro/2026: **17 protocolos** dentro do
+ * universo (23 no total; 6 ficam de fora por catálogo `Suporte Tecnico` e
+ * equipe `Suporte - Atendimento`, como qualquer outro tipo ficaria), e os 17
+ * geraram **40 slots reservados com 11 técnicos distintos** — visita de campo
+ * real, invisível só aqui.
+ *
+ * NÃO entra em Preventivos, e não precisa de regra para isso: `eh_preventiva`
+ * exige tipo preventivo ou categoria preventiva, e a categoria destes é
+ * INSTABILIDADE (12) ou INDISPONIBILIDADE (5). Ver docs/06.
  */
 export const TIPOS_CAMPO = [
   'TEC - Suporte técnico',
@@ -417,6 +437,7 @@ export const TIPOS_CAMPO = [
   'TEC-MANUT-INT-CLIN-REGULARIZACAO',
   'TEC - Suporte / Problema [ Telefonia ]',
   'TEC-ACESSO-CLI-RETORNO-PRIORITARIO',
+  'TEC-MANUT-ACESSO-CLI-INTENCAO-CANCELAMENTO',
 ] as const
 
 /**
