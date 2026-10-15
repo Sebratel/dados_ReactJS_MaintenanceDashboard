@@ -3,6 +3,7 @@ import { STATUS_ENCERRADO } from '@/config/regras-negocio'
 import { DIMENSOES, ehDimensaoOrdinal, type Filtros } from '@/lib/filtros'
 import {
   EXPR,
+  CASAS_HORA,
   deslocarParams,
   montarFrom,
   montarWhere,
@@ -90,7 +91,7 @@ export async function obterRanking(f: Filtros): Promise<{
     ),
     tempos AS (
       SELECT ${rotulo} AS rotulo,
-             round(avg(extract(epoch from (a.conclusion_date - a.created)) / 3600.0)::numeric, 2) AS mttr_h
+             round(avg(extract(epoch from (a.conclusion_date - a.created)) / 3600.0)::numeric, ${CASAS_HORA}) AS mttr_h
       ${FROM}
       ${wTempo.sql}
       GROUP BY 1

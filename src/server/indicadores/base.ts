@@ -188,6 +188,32 @@ export function partesNecessarias(f: Filtros, extra: PartesFrom = {}): PartesFro
   }
 }
 
+/**
+ * Casas decimais da MÉDIA EM HORAS que sai do SQL.
+ *
+ * ⚠️ ERA 2, E 2 CASAS DE HORA SÃO 36 SEGUNDOS. Todo MTTR desta base é exibido
+ * como `h:mm:ss` por `fmtHoras` — o formato promete precisão de segundo sobre um
+ * número que, com duas casas, só conseguia andar de 36 em 36.
+ *
+ * Achado no batimento de setembro/2026 contra o Power BI: o card de Tempos
+ * mostrava 17:30:36 onde o valor real era 17:30:40 e o BI mostrava 17:30:41. Os
+ * 5 segundos não eram divergência de critério com o BI — eram arredondamento
+ * nosso, e o BI estava certo. Erro possível de até 18 segundos em qualquer
+ * célula.
+ *
+ * O arredondamento não tinha justificativa escrita em nenhum dos cinco pontos
+ * onde aparecia; era incidental, não decisão. No mesmo card, o MTTA sempre teve
+ * precisão cheia — dois indicadores lado a lado com precisões diferentes.
+ *
+ * ⚠️ CONSEQUÊNCIA AO COMPARAR COM O POWER BI: os pivôs de MTTR_A do Relatório
+ * Executivo exibem 2 casas decimais, então as nossas células deixam de bater com
+ * eles ao segundo — ficam até 18s diferentes. Isso é esperado e é o lado certo
+ * da diferença: o número do BI é que está arredondado. Ver docs/06.
+ *
+ * 6 casas = 3,6 ms, muito abaixo de qualquer coisa que o formato mostre.
+ */
+export const CASAS_HORA = 6
+
 /** Expressões derivadas reutilizáveis (as "colunas calculadas" do Power BI). */
 export const EXPR = {
   mttrHoras: `extract(epoch from (a.conclusion_date - a.created)) / 3600.0`,

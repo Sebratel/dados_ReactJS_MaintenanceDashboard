@@ -1,7 +1,7 @@
 import { consultarErp } from '@/server/db/erp'
 import { STATUS_ENCERRADO } from '@/config/regras-negocio'
 import type { Filtros } from '@/lib/filtros'
-import { montarFrom, montarWhere, partesNecessarias, porEncerramento } from './base'
+import { CASAS_HORA, montarFrom, montarWhere, partesNecessarias, porEncerramento } from './base'
 
 export type Kpis = {
   protocolos: number
@@ -129,8 +129,8 @@ export async function obterKpis(f: Filtros): Promise<{ data: Kpis; ms: number }>
   const noAtual = `a.conclusion_date >= $${iCorte}::date`
 
   const sqlTempo = /* sql */ `
-    SELECT round(avg(${mttr}) FILTER (WHERE ${noAtual})::numeric, 2)       AS mttr_h,
-           round(avg(${mttr}) FILTER (WHERE NOT (${noAtual}))::numeric, 2) AS ant_mttr_h,
+    SELECT round(avg(${mttr}) FILTER (WHERE ${noAtual})::numeric, ${CASAS_HORA})       AS mttr_h,
+           round(avg(${mttr}) FILTER (WHERE NOT (${noAtual}))::numeric, ${CASAS_HORA}) AS ant_mttr_h,
            count(distinct ai.protocol) FILTER (WHERE ${noAtual})::int      AS encerrados_periodo
     ${montarFrom(partesNecessarias(fTempo))}
     ${w3.sql}

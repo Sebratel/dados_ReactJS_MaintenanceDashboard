@@ -9,7 +9,7 @@ import {
   TIPOS_PREVENTIVOS,
 } from '@/config/regras-negocio'
 import type { Filtros } from '@/lib/filtros'
-import { colunaEixo, montarFrom, montarWhere } from './base'
+import { CASAS_HORA, colunaEixo, montarFrom, montarWhere } from './base'
 
 /**
  * RELATÓRIO ANALÍTICO — um protocolo por linha.
@@ -460,7 +460,7 @@ export async function obterProtocolos(f: Filtros): Promise<ResultadoProtocolos> 
            coalesce(s.qtd_agendamentos, 0)   AS "agendamentos",
            s.primeira_agenda                 AS "primeiraAgenda",
            s.ultima_agenda                   AS "ultimaAgenda",
-           round((extract(epoch from (a.conclusion_date - a.created)) / 3600.0)::numeric, 2)
+           round((extract(epoch from (a.conclusion_date - a.created)) / 3600.0)::numeric, ${CASAS_HORA})
                                              AS "mttrHoras",
            coalesce(i.dias, 0)               AS "improdutivas",
            i.motivos                         AS "motivosImprod",

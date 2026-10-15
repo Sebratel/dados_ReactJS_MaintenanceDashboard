@@ -1,7 +1,7 @@
 import { consultarErp } from '@/server/db/erp'
 import { STATUS_ENCERRADO } from '@/config/regras-negocio'
 import type { Filtros } from '@/lib/filtros'
-import { montarFrom, montarWhere, partesNecessarias, truncGranularidade } from './base'
+import { CASAS_HORA, montarFrom, montarWhere, partesNecessarias, truncGranularidade } from './base'
 
 /**
  * ⚠️ TUDO ANULÁVEL POR CAUSA DO FUTURO, e a diferença importa: `0` é uma
@@ -81,7 +81,7 @@ export async function obterSerie(f: Filtros): Promise<{
     saidas AS (
       SELECT date_trunc('${trunc}', a.conclusion_date)::date AS periodo,
              count(distinct ai.protocol)::int AS n,
-             round(avg(extract(epoch from (a.conclusion_date - a.created)) / 3600.0)::numeric, 2) AS mttr_h
+             round(avg(extract(epoch from (a.conclusion_date - a.created)) / 3600.0)::numeric, ${CASAS_HORA}) AS mttr_h
       ${FROM}
       ${w.sql}
         AND st.title = any($${enc})

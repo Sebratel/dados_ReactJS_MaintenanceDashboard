@@ -1,6 +1,6 @@
 import { consultarErp } from '@/server/db/erp'
 import type { Filtros } from '@/lib/filtros'
-import { EXPR, montarFrom, montarWhere, partesNecessarias, porAbertura } from './base'
+import { CASAS_HORA, EXPR, montarFrom, montarWhere, partesNecessarias, porAbertura } from './base'
 
 export type CelulaHeatmap = {
   diaSemana: number
@@ -50,7 +50,7 @@ export async function obterHeatmap(f: Filtros): Promise<{
     SELECT ${EXPR.diaSemanaNum} AS dia,
            ${EXPR.turno} AS turno,
            count(distinct ai.protocol)::int AS protocolos,
-           round(avg(extract(epoch from (a.conclusion_date - a.created)) / 3600.0)::numeric, 2) AS mttr_h
+           round(avg(extract(epoch from (a.conclusion_date - a.created)) / 3600.0)::numeric, ${CASAS_HORA}) AS mttr_h
     ${FROM}
     ${w.sql}
     GROUP BY 1, 2
