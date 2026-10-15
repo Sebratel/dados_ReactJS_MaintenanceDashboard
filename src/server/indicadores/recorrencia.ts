@@ -9,7 +9,7 @@ import {
   TIPOS_FORA_DA_RECORRENCIA,
   TIPOS_PREVENTIVOS,
 } from '@/config/regras-negocio'
-import type { Filtros } from '@/lib/filtros'
+import { CLASSE_REC_POR_CODIGO, type Filtros } from '@/lib/filtros'
 
 /**
  * Reincidência e recorrência de clientes (docs/01 §5).
@@ -213,6 +213,7 @@ export async function obterRecorrencia(f: Filtros): Promise<ResultadoRecorrencia
   const cond: string[] = []
   if (f.base) cond.push(`ag.regiao = any(${p(f.base)}::text[])`)
   if (f.cidade) cond.push(`pe.city = any(${p(f.cidade)}::text[])`)
+  if (f.bairro) cond.push(`pe.neighborhood = any(${p(f.bairro)}::text[])`)
   if (f.equipe) cond.push(`t.title = any(${p(f.equipe)}::text[])`)
   if (f.catalogo) cond.push(`cs.title = any(${p(f.catalogo)}::text[])`)
   if (f.tipo) cond.push(`it.title = any(${p(f.tipo)}::text[])`)
@@ -451,11 +452,32 @@ export async function obterRecorrencia(f: Filtros): Promise<ResultadoRecorrencia
    */
   let clientesBase = 0
 
+  /**
+   * ⚠️ O PAINEL DE CLASSIFICAÇÃO NÃO SE AUTO-FILTRA.
+   *
+   * `classeRec` recorta tudo — totais, cidade, bairro, catálogo, mês —, mas o
+   * próprio gráfico de classes continua mostrando as quatro barras. É a regra
+   * de cross-filter que o Power BI também segue, e aqui ela é obrigatória: o
+   * gráfico é o único controle deste filtro. Se ele se auto-filtrasse, sobraria
+   * UMA barra na tela e não haveria como trocar de classe nem remover o
+   * recorte sem editar a URL na mão.
+   *
+   * Por isso o filtro é aplicado em JS e não no SQL: a classe é atributo das
+   * linhas que a consulta JÁ devolveu, então dá para contar os dois conjuntos
+   * numa passagem só. Cidade, bairro e catálogo vão no WHERE porque lá o
+   * recorte muda QUAIS linhas existem.
+   */
+  const classeAlvo = f.classeRec ? CLASSE_REC_POR_CODIGO[f.classeRec] : null
+  /** total do recorte SEM o filtro de classe — denominador do painel de classes */
+  let baseSemClasse = 0
+
   for (const r of rows) {
     const n = r.clientes
+    baseSemClasse += n
+    recorMap.set(r.classe_recorrencia, (recorMap.get(r.classe_recorrencia) ?? 0) + n)
+    if (classeAlvo && r.classe_recorrencia !== classeAlvo) continue
     clientesBase += n
     reincMap.set(r.classe_reincidencia, (reincMap.get(r.classe_reincidencia) ?? 0) + n)
-    recorMap.set(r.classe_recorrencia, (recorMap.get(r.classe_recorrencia) ?? 0) + n)
 
     const ehRei = r.classe_reincidencia !== 'Não Reincidente'
     const ehRec = r.classe_recorrencia !== 'Não recorrente'
@@ -518,10 +540,12 @@ export async function obterRecorrencia(f: Filtros): Promise<ResultadoRecorrencia
         clientes: reincMap.get(classe) ?? 0,
         share: taxa(reincMap.get(classe) ?? 0, clientesBase) ?? 0,
       })),
+      // share sobre `baseSemClasse`: as quatro barras continuam somando 100%
+      // mesmo com uma classe selecionada — ver a nota do cross-filter acima.
       porClasseRecorrencia: ORDEM_RECOR.map((classe) => ({
         classe,
         clientes: recorMap.get(classe) ?? 0,
-        share: taxa(recorMap.get(classe) ?? 0, clientesBase) ?? 0,
+        share: taxa(recorMap.get(classe) ?? 0, baseSemClasse) ?? 0,
       })),
       porCidade: paraDim(cidadeMap),
       porBairro: paraDim(bairroMap),

@@ -10,6 +10,7 @@ import { montarFrom, montarWhere, porAbertura, porEncerramento } from './base'
 export type OpcoesFiltro = {
   base: string[]
   cidade: string[]
+  bairro: string[]
   equipe: string[]
   catalogo: string[]
   tipo: string[]
@@ -86,6 +87,7 @@ export async function obterOpcoesFiltro(f: Filtros): Promise<{ data: OpcoesFiltr
   const selecionar = (clausula: string) => /* sql */ `
     SELECT
       array_agg(DISTINCT p.city)     FILTER (WHERE nullif(trim(p.city), '')     IS NOT NULL) AS cidade,
+      array_agg(DISTINCT p.neighborhood) FILTER (WHERE nullif(trim(p.neighborhood), '') IS NOT NULL) AS bairro,
       array_agg(DISTINCT t.title)    FILTER (WHERE nullif(trim(t.title), '')    IS NOT NULL) AS equipe,
       array_agg(DISTINCT cs.title)   FILTER (WHERE nullif(trim(cs.title), '')   IS NOT NULL) AS catalogo,
       array_agg(DISTINCT it.title)   FILTER (WHERE nullif(trim(it.title), '')   IS NOT NULL) AS tipo,
@@ -193,6 +195,7 @@ export async function obterOpcoesFiltro(f: Filtros): Promise<{ data: OpcoesFiltr
     data: {
       base: unir(rb.rows[0]?.base),
       cidade: unir(porCriacao?.cidade, porFim?.cidade),
+      bairro: unir(porCriacao?.bairro, porFim?.bairro),
       equipe: unir(porCriacao?.equipe, porFim?.equipe),
       catalogo: unir(porCriacao?.catalogo, porFim?.catalogo),
       tipo: unir(porCriacao?.tipo, porFim?.tipo),

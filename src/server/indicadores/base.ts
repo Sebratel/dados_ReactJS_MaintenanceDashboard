@@ -303,6 +303,7 @@ export function montarWhere(
   // `partesNecessarias` garante isso ao ver `f.base` preenchido.
   if (f.base) cond.push(`s.regiao_agenda = any(${p(f.base)})`)
   if (f.cidade) cond.push(`p.city = any(${p(f.cidade)})`)
+  if (f.bairro) cond.push(`p.neighborhood = any(${p(f.bairro)})`)
   if (f.equipe) cond.push(`t.title = any(${p(f.equipe)})`)
   if (f.tecnico) cond.push(`resp.name = any(${p(f.tecnico)})`)
   if (f.catalogo) cond.push(`cs.title = any(${p(f.catalogo)})`)

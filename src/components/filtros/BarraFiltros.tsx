@@ -12,6 +12,7 @@ const CAMPOS_MULTI = [
   // Base primeiro de propósito: é o corte de supervisão, o mais usado.
   { chave: 'base', label: 'Base' },
   { chave: 'cidade', label: 'Cidade' },
+  { chave: 'bairro', label: 'Bairro' },
   { chave: 'equipe', label: 'Equipe' },
   { chave: 'catalogo', label: 'Catálogo' },
   { chave: 'tipo', label: 'Tipo' },

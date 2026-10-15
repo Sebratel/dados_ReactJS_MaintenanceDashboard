@@ -86,6 +86,24 @@ const listaTexto = z
     return limpo.length ? limpo : undefined
   })
 
+/**
+ * Ponte entre o codigo curto de `classeRec` na URL e o rotulo exibido.
+ *
+ * MORA AQUI, E NAO EM `server/indicadores/recorrencia.ts`, por empacotamento:
+ * a tela de Recorrencia e componente de cliente e precisa dos dois sentidos do
+ * mapa. Importa-lo do modulo do indicador faria o bundle do navegador apontar
+ * para o arquivo que carrega o driver do `pg` -- mesmo motivo pelo qual `Papel`
+ * vive em `config/telas.ts` e nao em `server/auth/acesso.ts`.
+ */
+export const CLASSE_REC_POR_CODIGO = {
+  r30: 'Recorrente 30',
+  r60: 'Recorrente 60',
+  r90: 'Recorrente 90',
+  nao: 'Não recorrente',
+} as const
+
+export type CodigoClasseRec = keyof typeof CLASSE_REC_POR_CODIGO
+
 export const FiltrosSchema = z.object({
   de: dataISO,
   ate: dataISO,
@@ -99,6 +117,26 @@ export const FiltrosSchema = z.object({
   eixo: z.enum(['criacao', 'encerramento', 'agenda']).default('criacao'),
   granularidade: z.enum(['dia', 'semana', 'mes']).default('dia'),
   cidade: listaTexto,
+  /**
+   * Bairro do solicitante. Entrou em 15/10/2026 junto com o cross-filter da
+   * tela de Recorrência: clicar numa barra precisa virar filtro de verdade, e
+   * filtro que só funciona numa tela é o defeito que já corrigimos na
+   * Preventiva. Por isso ele vale em todas — `montarWhere` e `opcoes` incluídos.
+   */
+  bairro: listaTexto,
+  /**
+   * Classe de recorrência do login no mês — filtro LOCAL da tela de
+   * Recorrência, como `reincidencia` e `retorno` são de Protocolos.
+   *
+   * Fica fora da barra global pelo mesmo motivo deles: nas outras telas não
+   * haveria o que filtrar, e filtro que não faz nada é pior que filtro
+   * ausente. Aqui o controle é o próprio gráfico: clicar na barra aplica,
+   * clicar de novo remove, e o painel diz o recorte ativo.
+   *
+   * Código curto na URL em vez do rótulo: 'Não recorrente' com acento e
+   * espaço vira %C3%A3o%20 no link que a pessoa copia para o colega.
+   */
+  classeRec: z.enum(['r30', 'r60', 'r90', 'nao']).optional(),
   equipe: listaTexto,
   tecnico: listaTexto,
   catalogo: listaTexto,
@@ -153,6 +191,8 @@ export function parsearFiltros(sp: URLSearchParams | Record<string, string | str
     granularidade: obj.granularidade ?? base.granularidade,
     base: obj.base,
     cidade: obj.cidade,
+    bairro: obj.bairro,
+    classeRec: obj.classeRec,
     equipe: obj.equipe,
     tecnico: obj.tecnico,
     catalogo: obj.catalogo,
