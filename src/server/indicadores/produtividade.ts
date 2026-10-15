@@ -169,8 +169,22 @@ export type ResultadoProdutividade = {
   data: {
     total: MedidasProdutividade & {
       protocolosBase: number
-      /** Participações produtivas ÷ Σ(dias produtivos de cada técnico) */
+      /**
+       * Produtivos ÷ Σ(dias produtivos de cada técnico como TITULAR).
+       *
+       * Mesma conta da medida `Média Reparos Produtivos Time` do Power BI,
+       * confirmada termo a termo em 15/10/2026 — `DIVIDE([Produtivo],
+       * SUMX(VALUES(Técnico), CALCULATE(DISTINCTCOUNT(Dia), Status="Produtivo")))`.
+       *
+       * ⚠️ NÃO CONFUNDIR COM A PRODUÇÃO DIÁRIA DA OPERAÇÃO. Em setembro/2026
+       * esta medida dá 5,37 (3.842 ÷ 715 dias-técnico); a produção diária da
+       * operação dá 128,07 (3.842 ÷ 30 dias). O Power BI chama as duas de
+       * "Média Diária Produtivos" em visuais diferentes, e é por isso que o
+       * cartão exibe o denominador: lendo o card dá para refazer a conta.
+       */
       mediaReparosTime: number | null
+      /** o denominador de `mediaReparosTime`, exibido para o número ser auditável */
+      diasTimeSomados: number
       tecnicosAtivos: number
       /** visitas com auxiliar real identificado — cobertura do crédito */
       visitasComDupla: number
@@ -719,6 +733,7 @@ export async function obterProdutividade(f: Filtros): Promise<ResultadoProdutivi
         protocolosBase: total.totalVisitas,
         mediaReparosTime:
           diasTimeSomados > 0 ? total.produtivo / diasTimeSomados : null,
+        diasTimeSomados,
         tecnicosAtivos: porTecnico.length,
         visitasComDupla,
         visitasComRegistro,

@@ -166,9 +166,24 @@ export function ProdutividadeConteudo() {
           subirEhRuim
         />
         <StatTile
-          rotulo="Atividades por técnico/dia"
+          rotulo="Média diária produtivos"
           valor={q.isLoading ? '…' : fmtDec(t?.mediaReparosTime)}
-          contexto={t ? `${fmtInt(t.tecnicosAtivos)} técnicos creditados` : undefined}
+          /*
+            O DENOMINADOR FICA NO CARTÃO DE PROPÓSITO — é o que torna o número
+            auditável sem abrir o código, e é o que separa esta medida da
+            produção diária da operação (3.842 ÷ 30 = 128,07). O Power BI chama
+            as duas de "Média Diária Produtivos" em visuais diferentes.
+
+            O rótulo anterior era "Atividades por técnico/dia", e a Manutenção
+            pediu a troca em 15/10/2026 pelo melhor dos motivos: "atividade"
+            convida a entender que improdutivo entra na soma, e não entra — o
+            numerador é só produtivo.
+          */
+          contexto={
+            t
+              ? `${fmtInt(t.produtivo)} produtivos ÷ ${fmtInt(t.diasTimeSomados)} dias-técnico`
+              : undefined
+          }
         />
         {/*
           Este cartão é o que torna o registro da dupla cobrável: hoje é processo
