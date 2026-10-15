@@ -110,6 +110,13 @@ export type PontoMesRecorrencia = {
   reincidentes: number
   recorrentes: number
   taxaReincidencia: number | null
+  /**
+   * Faltava, e a tela de Recorrência precisava dela: a série mensal só
+   * devolvia a taxa de REINCIDÊNCIA, então o painel de evolução não tinha como
+   * falar de recorrência sem recalcular `rec / clientes` no cliente — conta que
+   * já existe aqui e em todas as outras dimensões.
+   */
+  taxaRecorrencia: number | null
 }
 
 export type ResultadoRecorrencia = {
@@ -507,6 +514,7 @@ export async function obterRecorrencia(f: Filtros): Promise<ResultadoRecorrencia
           reincidentes: v.rei,
           recorrentes: v.rec,
           taxaReincidencia: taxa(v.rei, v.c),
+          taxaRecorrencia: taxa(v.rec, v.c),
         }))
         .sort((a, b) => a.mes.localeCompare(b.mes)),
     },
