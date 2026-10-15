@@ -88,6 +88,7 @@ type LinhaRecorrencia = {
   classe_reincidencia: ClasseReincidencia
   classe_recorrencia: ClasseRecorrencia
   cidade: string | null
+  bairro: string | null
   catalogo: string | null
   mes: string
   clientes: number
@@ -138,6 +139,19 @@ export type ResultadoRecorrencia = {
     porClasseReincidencia: ItemClasse<ClasseReincidencia>[]
     porClasseRecorrencia: ItemClasse<ClasseRecorrencia>[]
     porCidade: ItemDimensaoRecorrencia[]
+    /**
+     * Bairro do SOLICITANTE (`people.neighborhood`), pedido da Manutenção em
+     * 15/10/2026 — é o grão em que a operação consegue agir: cidade diz onde
+     * olhar, bairro diz onde ir.
+     *
+     * ⚠️ Acrescentar `bairro` ao GROUP BY não mexe em total nenhum, e isso não
+     * é sorte: `base` tem UMA linha por (instalação, mês) — é o que `rn_mes = 1`
+     * garante —, então cada instalação já tem um único bairro. A coluna é
+     * funcionalmente determinada pelo que já estava agrupado, e o
+     * `count(DISTINCT instalacao)` não se reparte. Conferido depois da mudança:
+     * `clientesBase` e `recorrentes` idênticos.
+     */
+    porBairro: ItemDimensaoRecorrencia[]
     porCatalogo: ItemDimensaoRecorrencia[]
     porMes: PontoMesRecorrencia[]
   }
@@ -241,6 +255,7 @@ export async function obterRecorrencia(f: Filtros): Promise<ResultadoRecorrencia
              coalesce(ac.user, 'tag:' || ai.contract_service_tag_id::text)
                AS instalacao,
              pe.city AS cidade,
+             pe.neighborhood AS bairro,
              cs.title AS catalogo,
              (cat2.title = any(${catsPrev}) OR it.title = any(${tiposPrev})) AS eh_preventiva
         FROM erp.assignment_incidents ai
@@ -355,6 +370,7 @@ export async function obterRecorrencia(f: Filtros): Promise<ResultadoRecorrencia
     ),
     classificado AS (
       SELECT b.cidade,
+             b.bairro,
              b.catalogo,
              to_char(date_trunc('month', b.created), 'YYYY-MM') AS mes,
              b.instalacao,
@@ -376,10 +392,10 @@ export async function obterRecorrencia(f: Filtros): Promise<ResultadoRecorrencia
              END AS classe_recorrencia
         FROM base b
     )
-    SELECT classe_reincidencia, classe_recorrencia, cidade, catalogo, mes,
+    SELECT classe_reincidencia, classe_recorrencia, cidade, bairro, catalogo, mes,
            count(DISTINCT instalacao)::int AS clientes
       FROM classificado
-     GROUP BY 1, 2, 3, 4, 5`
+     GROUP BY 1, 2, 3, 4, 5, 6`
 
   const { rows, ms } = await consultarErp<LinhaRecorrencia>(sql, params)
 
@@ -421,6 +437,7 @@ export async function obterRecorrencia(f: Filtros): Promise<ResultadoRecorrencia
   const reincMap = new Map<ClasseReincidencia, number>()
   const recorMap = new Map<ClasseRecorrencia, number>()
   const cidadeMap = new Map<string, { c: number; rei: number; rec: number }>()
+  const bairroMap = new Map<string, { c: number; rei: number; rec: number }>()
   const catMap = new Map<string, { c: number; rei: number; rec: number }>()
   const mesMap = new Map<string, { c: number; rei: number; rec: number }>()
 
@@ -455,6 +472,7 @@ export async function obterRecorrencia(f: Filtros): Promise<ResultadoRecorrencia
     }
 
     soma(cidadeMap, r.cidade ?? '(sem cidade)')
+    soma(bairroMap, r.bairro ?? '(sem bairro)')
     soma(catMap, r.catalogo ?? '(sem catálogo)')
     soma(mesMap, r.mes)
   }
@@ -506,6 +524,7 @@ export async function obterRecorrencia(f: Filtros): Promise<ResultadoRecorrencia
         share: taxa(recorMap.get(classe) ?? 0, clientesBase) ?? 0,
       })),
       porCidade: paraDim(cidadeMap),
+      porBairro: paraDim(bairroMap),
       porCatalogo: paraDim(catMap),
       porMes: [...mesMap.entries()]
         .map(([mes, v]) => ({

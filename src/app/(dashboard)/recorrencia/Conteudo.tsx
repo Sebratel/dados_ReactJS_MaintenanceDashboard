@@ -245,6 +245,49 @@ export function RecorrenciaConteudo() {
         </Painel>
       </div>
 
+      {/*
+        BAIRRO EM LARGURA CHEIA, E NÃO ao lado de cidade/catálogo: cidade tem 8
+        valores e catálogo 3, mas bairro tem dezenas — numa coluna estreita o
+        rótulo come o gráfico, porque `RankingSimples` deixa `containLabel`
+        medir o texto real e um "Vila Nova Santa Luzia" empurra as barras para
+        a direita até sobrar nada.
+      */}
+      <Painel
+        titulo="Recorrência por bairro"
+        descricao="Barra = logins crônicos. O grão em que a operação age — cidade diz onde olhar, bairro diz onde ir."
+        carregando={q.isLoading}
+        erro={erro}
+        nota="Bairro do solicitante, como cadastrado no Voalle"
+        tabela={{
+          colunas: [
+            { chave: 'bairro', rotulo: 'Bairro' },
+            { chave: 'clientes', rotulo: 'Reparos-mês', alinhar: 'dir' },
+            { chave: 'rec', rotulo: 'Recorrentes', alinhar: 'dir' },
+            { chave: 'taxaRec', rotulo: 'Taxa recor.', alinhar: 'dir' },
+          ],
+          linhas: (d?.porBairro ?? []).map((x) => ({
+            bairro: x.rotulo,
+            clientes: fmtInt(x.clientes),
+            rec: fmtInt(x.recorrentes),
+            taxaRec: fmtFracaoPct(x.taxaRecorrencia, 1),
+          })),
+        }}
+      >
+        {d && (
+          <RankingSimples
+            dados={[...d.porBairro]
+              .sort((a, b) => b.recorrentes - a.recorrentes)
+              .slice(0, 15)
+              .map((x) => ({
+                rotulo: x.rotulo,
+                valor: x.recorrentes,
+                detalhe: `${fmtInt(x.clientes)} reparos-mês · taxa ${fmtFracaoPct(x.taxaRecorrencia, 1)}`,
+              }))}
+            unidade="logins crônicos"
+          />
+        )}
+      </Painel>
+
       {d && d.porMes.length > 1 && (
         <Painel
           titulo="Evolução mensal"
