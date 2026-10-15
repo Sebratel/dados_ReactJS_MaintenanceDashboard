@@ -47,6 +47,33 @@ export function BarraFiltros() {
   const eixoGovernaTela = pathname !== '/tempos'
 
   /**
+   * ⚠️ STATUS NÃO VALE NA PRODUTIVIDADE — e o controle fica à vista, inerte.
+   *
+   * Aquela página conta VISITA, não DEMANDA: a ida aconteceu mesmo que o
+   * protocolo tenha sido cancelado depois (decisão da Manutenção, 03/09/2026).
+   * Como `status` é filtro global, quem vinha de Tempos ou Preventivos chegava
+   * lá com Cancelado excluído e a página contrariava a própria regra calada —
+   * eram 67 visitas em setembro/2026, a diferença inteira contra o Power BI.
+   *
+   * ESCONDER O CONTROLE SERIA PIOR, E UM RÓTULO MORTO TAMBÉM. Quem acabou de
+   * selecionar um status na aba anterior veria o filtro sumir e concluiria que
+   * foi aplicado; e um rótulo apagado dizendo "não se aplica" obriga a acreditar
+   * na tarja sem poder conferir. Foi o que a Manutenção recusou em 15/10/2026:
+   *
+   *   "deixar visual o filtro mas inativo... o usuário ia ver que Cancelado,
+   *    por exemplo, está flegado por regra"
+   *
+   * Então o controle ABRE normalmente e mostra a lista inteira TODA MARCADA, em
+   * linhas inertes (`span`, não `button`). A pessoa vê com os próprios olhos que
+   * Cancelado está incluído, e por quê — a nota no rodapé do dropdown explica.
+   * A seleção que ela fez segue na URL e volta a valer na próxima aba.
+   *
+   * Difere do `eixo da data` em /tempos de propósito: lá o controle vira um
+   * rótulo fixo porque não há lista nenhuma para mostrar.
+   */
+  const statusGovernaTela = pathname !== '/produtividade'
+
+  /**
    * A tela de Preventivos só sabe filtrar ENTRE preventivas.
    *
    * Oferecer os outros tipos ali era um botao que nao faz nada: a pessoa
@@ -240,6 +267,48 @@ export function BarraFiltros() {
             lista = lista.filter((v) => tiposPermitidos.includes(v))
           if (c.chave === 'catalogo' && catalogosPermitidos)
             lista = lista.filter((v) => catalogosPermitidos.includes(v))
+          const rotuloSel =
+            sel.length === 0 ? 'Todos' : sel.length === 1 ? sel[0]! : `${sel.length} selec.`
+          if (c.chave === 'status' && !statusGovernaTela) {
+            return (
+              <Dropdown
+                key={c.chave}
+                id={c.chave}
+                aberto={aberto}
+                setAberto={setAberto}
+                rotulo={c.label}
+                valor="Todos · por regra"
+                largura="w-72"
+              >
+                <div className="max-h-72 overflow-auto py-1">
+                  {lista.length === 0 && (
+                    <p className="px-3 py-2 text-xs text-[var(--text-muted)]">carregando…</p>
+                  )}
+                  {/* linhas INERTES: span, não button — todas marcadas, nenhuma clicável */}
+                  {lista.map((v) => (
+                    <span
+                      key={v}
+                      className="flex w-full items-start gap-2 px-3 py-1.5 text-left text-xs text-[var(--text-muted)]"
+                    >
+                      <span className="w-4 shrink-0 text-center font-bold" aria-hidden="true">
+                        ✓
+                      </span>
+                      <span>{v}</span>
+                    </span>
+                  ))}
+                </div>
+                <p
+                  className="px-3 py-2 text-[11px] leading-snug text-[var(--text-muted)]"
+                  style={{ borderTop: '1px solid var(--border)' }}
+                >
+                  Todos contam <strong>por regra</strong>, Cancelado inclusive: esta tela mede{' '}
+                  <strong>visita</strong>, e a ida ao cliente aconteceu mesmo que o protocolo tenha
+                  morrido depois. Por isso o filtro não se aplica aqui — a seleção que você fez
+                  continua valendo nas outras abas.
+                </p>
+              </Dropdown>
+            )
+          }
           return (
             <Dropdown
               key={c.chave}
@@ -247,7 +316,7 @@ export function BarraFiltros() {
               aberto={aberto}
               setAberto={setAberto}
               rotulo={c.label}
-              valor={sel.length === 0 ? 'Todos' : sel.length === 1 ? sel[0]! : `${sel.length} selec.`}
+              valor={rotuloSel}
               ativo={sel.length > 0}
               largura="w-72"
             >

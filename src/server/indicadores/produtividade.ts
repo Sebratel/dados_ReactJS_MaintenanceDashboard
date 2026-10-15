@@ -249,7 +249,35 @@ export async function obterProdutividade(f: Filtros): Promise<ResultadoProdutivi
   // a view já tem a base: filtrar aqui encolhe o conjunto antes de tudo
   if (f.base) cond.push(`v.region_title = any(${p(f.base)})`)
   if (f.tipo) cond.push(`v.incident_type_title = any(${p(f.tipo)})`)
-  if (f.status) cond.push(`v.incident_status_title = any(${p(f.status)})`)
+  /**
+   * ⚠️ O FILTRO DE STATUS NÃO É APLICADO AQUI, E ISSO É A REGRA, NÃO UM FURO.
+   *
+   * Esta página conta VISITA, não DEMANDA: a ida ao cliente aconteceu mesmo que
+   * o protocolo tenha sido cancelado depois. É a decisão explícita da Manutenção
+   * em 03/09/2026 — "protocolo cancelado também vai contar, o BI já conta" — e
+   * está escrita de novo, em maiúsculas, no CTE `matriz_base` lá embaixo.
+   *
+   * O PROBLEMA ERA QUE A BARRA PODIA REVOGAR ESSA REGRA SEM NINGUÉM PERCEBER.
+   * `status` é filtro global: quem vem de Tempos ou Preventivos — onde excluir
+   * Cancelado está certo — chega aqui com ele ligado, e a página passava a
+   * contrariar o próprio critério em silêncio.
+   *
+   * Medido no batimento de setembro/2026 contra o BI (15/10/2026). Com
+   * `status=Agendado~Andamento~Encerrado` herdado da aba anterior:
+   *
+   *   produtivos ....... 0 a menos  (cancelado nunca é produtivo: exige
+   *                                  encerramento no dia da visita)
+   *   improdutivas .... 34 a menos
+   *   sem ação ........ 33 a menos
+   *   ---------------------------------
+   *   67 visitas somem, e a tela não dizia nada.
+   *
+   * Era a diferença INTEIRA contra o Power BI nesta página: sem o filtro, os
+   * 3.842 produtivos e as 392 improdutivas batem exatamente.
+   *
+   * A barra mostra o controle inerte em vez de escondê-lo — quem trouxe o
+   * filtro vê que ele está lá e que aqui não vale. Ver BarraFiltros.
+   */
   const filtroSlots = cond.length ? `AND ${cond.join(' AND ')}` : ''
 
   // filtros que exigem descer no protocolo. `tecnico` entra aqui, e não na view:
