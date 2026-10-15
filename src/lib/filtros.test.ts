@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { idadeMaximaDias } from './filtros'
+import { idadeMaximaDias, parsearFiltros } from './filtros'
 
 /**
  * Esta função decide se um cartão mostra um número ou um "—". Errar para MENOS
@@ -58,5 +58,68 @@ describe('idadeMaximaDias', () => {
 
   it('recorte no futuro não devolve idade negativa', () => {
     expect(idadeMaximaDias('2026-10-01', em('2026-09-14'))).toBe(0)
+  })
+})
+
+/**
+ * ⚠️ ESTES TESTES EXISTEM PORQUE A TELA CAIU.
+ *
+ * Em 15/10/2026 a Manutenção ajustou o período pela barra de endereços e a URL
+ * ficou `?de=2026-08-01&ate=` — com o parâmetro presente e vazio. O `??` só cai
+ * no padrão para `undefined`, então a string vazia chegava ao schema, estourava
+ * um ZodError e derrubava o dashboard INTEIRO: `parsearFiltros` roda na
+ * `BarraFiltros`, que vive no layout.
+ *
+ * A regra que estes testes fixam é uma só: **nenhuma URL derruba a tela**. Pior
+ * recorte possível é o padrão, nunca uma exceção.
+ */
+describe('parsearFiltros: URL malformada degrada, não quebra', () => {
+  const q = (s: string) => parsearFiltros(new URLSearchParams(s))
+  const DATA = /^\d{4}-\d{2}-\d{2}$/
+
+  it('o caso real: `ate` presente e vazio', () => {
+    const f = q('de=2026-08-01&ate=')
+    expect(f.de).toBe('2026-08-01')
+    expect(f.ate).toMatch(DATA)
+  })
+
+  it('parâmetro vazio é tratado como ausente, não como valor', () => {
+    const f = q('de=&ate=&eixo=&dim=')
+    expect(f.de).toMatch(DATA)
+    expect(f.eixo).toBe('criacao')
+  })
+
+  it('descarta só o campo inválido e preserva o resto', () => {
+    const f = q('de=2026-08-01&ate=lixo&cidade=Canoas')
+    expect(f.de).toBe('2026-08-01')
+    expect(f.ate).toMatch(DATA)
+    expect(f.cidade).toEqual(['Canoas'])
+  })
+
+  it('enum inventado volta ao padrão sem levar o período junto', () => {
+    const f = q('de=2026-08-01&ate=2026-08-31&eixo=banana')
+    expect(f.eixo).toBe('criacao')
+    expect(f.de).toBe('2026-08-01')
+    expect(f.ate).toBe('2026-08-31')
+  })
+
+  it('período invertido não vira recorte vazio em silêncio', () => {
+    // `de` inválido volta ao padrão e pode cair DEPOIS do `ate` que sobreviveu
+    const f = q('de=ontem&ate=2026-08-31')
+    expect(f.de <= f.ate).toBe(true)
+  })
+
+  it('lixo completo ainda devolve um recorte utilizável', () => {
+    const f = q('tudo=errado&de=&ate=&limite=abc&classeRec=zzz')
+    expect(f.de <= f.ate).toBe(true)
+    expect(f.limite).toBeGreaterThan(0)
+  })
+
+  it('URL correta passa intacta', () => {
+    const f = q('de=2026-08-01&ate=2026-08-31&cidade=Canoas~Esteio&eixo=encerramento')
+    expect(f.de).toBe('2026-08-01')
+    expect(f.ate).toBe('2026-08-31')
+    expect(f.cidade).toEqual(['Canoas', 'Esteio'])
+    expect(f.eixo).toBe('encerramento')
   })
 })

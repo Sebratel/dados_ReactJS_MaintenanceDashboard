@@ -180,11 +180,43 @@ export function filtrosPadrao(hoje = new Date()): Filtros {
   return FiltrosSchema.parse({ de: primeiro, ate: ultimo })
 }
 
+/**
+ * Le os filtros da URL. **NUNCA LANCA.**
+ *
+ * ⚠️ POR QUE NAO PODE LANCAR: `parsearFiltros` roda na `BarraFiltros`, que vive
+ * no layout do dashboard. Uma excecao aqui nao derruba uma tela -- derruba
+ * TODAS, com um ZodError cru na cara de quem so queria ajustar uma data.
+ *
+ * Aconteceu em 15/10/2026: a Manutencao editou o periodo na barra de enderecos
+ * e a URL ficou `?de=2026-08-01&ate=` -- com o `ate` PRESENTE E VAZIO. O
+ * operador `??` so cai no padrao para `undefined` e `null`, entao a string
+ * vazia passava direto para o schema, falhava no regex de data e estourava.
+ *
+ * Duas camadas de defesa, nesta ordem:
+ *
+ * 1. **Vazio e ausente.** Parametro presente sem valor some antes do parse, e
+ *    ai o `??` funciona como sempre se esperou que funcionasse.
+ * 2. **Invalido cai no padrao, campo a campo.** Se mesmo assim algo nao passar
+ *    (`?de=ontem`, `?limite=abc`), o zod diz QUAIS caminhos falharam; descarta-
+ *    se so esses e tenta de novo. `?de=2026-08-01&ate=lixo` preserva o `de` e
+ *    devolve o `ate` padrao, em vez de jogar o recorte inteiro fora.
+ *
+ * O aviso no console fica: degradar em silencio esconderia um defeito nosso que
+ * esteja montando URL errada. A tela segue de pe; o rastro continua.
+ */
 export function parsearFiltros(sp: URLSearchParams | Record<string, string | string[] | undefined>): Filtros {
-  const obj =
+  const cru =
     sp instanceof URLSearchParams ? Object.fromEntries(sp.entries()) : sp
   const base = filtrosPadrao()
-  return FiltrosSchema.parse({
+
+  const obj: Record<string, string | string[] | undefined> = {}
+  for (const [k, v] of Object.entries(cru)) {
+    if (v === undefined || v === null) continue
+    if (typeof v === 'string' && v.trim() === '') continue
+    obj[k] = v
+  }
+
+  const candidato: Record<string, unknown> = {
     de: obj.de ?? base.de,
     ate: obj.ate ?? base.ate,
     eixo: obj.eixo ?? base.eixo,
@@ -203,7 +235,49 @@ export function parsearFiltros(sp: URLSearchParams | Record<string, string | str
     retorno: obj.retorno,
     dim: obj.dim ?? base.dim,
     limite: obj.limite ?? base.limite,
+  }
+
+  const r = FiltrosSchema.safeParse(candidato)
+  if (r.success) return r.data
+
+  const invalidos = new Set(
+    r.error.issues.map((i) => i.path[0]).filter((c): c is string => typeof c === 'string')
+  )
+  console.warn(
+    `[filtros] valor invalido na URL em ${[...invalidos].join(', ')} — usando o padrao nesses campos.`
+  )
+
+  const limpo: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(candidato)) if (!invalidos.has(k)) limpo[k] = v
+  // os obrigatorios voltam ao padrao se foram justamente eles que falharam
+  const r2 = FiltrosSchema.safeParse({
+    ...limpo,
+    de: limpo.de ?? base.de,
+    ate: limpo.ate ?? base.ate,
+    eixo: limpo.eixo ?? base.eixo,
+    granularidade: limpo.granularidade ?? base.granularidade,
+    dim: limpo.dim ?? base.dim,
+    limite: limpo.limite ?? base.limite,
   })
+  return garantirOrdem(r2.success ? r2.data : base, base)
+}
+
+/**
+ * `de` depois de `ate` devolve recorte VAZIO, e vazio em silencio e pior que
+ * erro: a tela carrega inteira, com todos os paineis em zero, e nada diz que o
+ * periodo esta invertido.
+ *
+ * Acontece quando so UM dos dois sobrevive ao saneamento acima --
+ * `?de=ontem&ate=2026-08-31` salva o `ate` de agosto e devolve o `de` padrao de
+ * outubro. Nao da para adivinhar qual deles a pessoa quis, entao os dois voltam
+ * ao padrao: um mes inteiro e coerente vale mais que meia intencao preservada.
+ */
+function garantirOrdem(f: Filtros, base: Filtros): Filtros {
+  if (f.de <= f.ate) return f
+  console.warn(
+    `[filtros] periodo invertido na URL (${f.de} ate ${f.ate}) — voltando ao padrao.`
+  )
+  return { ...f, de: base.de, ate: base.ate }
 }
 
 export function filtrosParaQuery(f: Partial<Filtros>): string {
