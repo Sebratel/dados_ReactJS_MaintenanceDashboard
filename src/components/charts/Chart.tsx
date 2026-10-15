@@ -45,11 +45,29 @@ export type ChartProps = {
   altura?: number
   className?: string
   'aria-label'?: string
+  /**
+   * Clique numa marca da série. Recebe o `dataIndex` — quem chama traduz para
+   * o seu domínio, porque só ele sabe a ordem em que montou os dados.
+   */
+  aoClicar?: (dataIndex: number) => void
 }
 
-export function Chart({ option, altura = 280, className, ...rest }: ChartProps) {
+export function Chart({ option, altura = 280, className, aoClicar, ...rest }: ChartProps) {
   const ref = useRef<HTMLDivElement>(null)
   const inst = useRef<echarts.ECharts | null>(null)
+
+  /**
+   * O callback vive numa ref, e não nas dependências do efeito de init.
+   *
+   * O efeito que cria a instância roda UMA vez (deps `[]`) — é ele que registra
+   * o `on('click')`. Se o handler entrasse ali direto, ele congelaria na
+   * primeira renderização e passaria a clicar com `searchParams` velho: o
+   * segundo clique desfaria o primeiro em vez de somar. Pôr `aoClicar` nas deps
+   * resolveria o congelamento e criaria outro problema — recriar o gráfico a
+   * cada render, perdendo zoom, hover e animação.
+   */
+  const aoClicarRef = useRef(aoClicar)
+  aoClicarRef.current = aoClicar
 
   useEffect(() => {
     if (!ref.current) return
@@ -62,6 +80,11 @@ export function Chart({ option, altura = 280, className, ...rest }: ChartProps) 
     // o tema muda quando o usuário alterna light/dark → recria a option
     const mo = new MutationObserver(() => chart.resize())
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+
+    chart.on('click', (p) => {
+      const i = (p as { dataIndex?: number }).dataIndex
+      if (typeof i === 'number') aoClicarRef.current?.(i)
+    })
 
     return () => {
       ro.disconnect()
@@ -81,7 +104,7 @@ export function Chart({ option, altura = 280, className, ...rest }: ChartProps) 
       ref={ref}
       role="img"
       className={className}
-      style={{ height: altura, width: '100%' }}
+      style={{ height: altura, width: '100%', cursor: aoClicar ? 'pointer' : undefined }}
       {...rest}
     />
   )

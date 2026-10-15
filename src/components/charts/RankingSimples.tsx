@@ -49,15 +49,23 @@ export function RankingSimples({
    * destruiria a leitura de "quanto mais recente, mais grave".
    */
   escala = 'nominal',
+  aoClicar,
+  selecionado = null,
 }: {
   dados: ItemSimples[]
   altura?: number
   unidade?: string
   escala?: 'nominal' | 'ordinal'
+  /** clique na barra; recebe o rótulo. Sem isto o gráfico não é interativo. */
+  aoClicar?: (rotulo: string) => void
+  /** rótulo em foco — os demais esmaecem, em vez de sumirem */
+  selecionado?: string | null
 }) {
+  // fora do useMemo: o handler de clique precisa da MESMA ordem que as barras
+  const ordenado = useMemo(() => [...dados].reverse(), [dados])
+
   const option = useMemo(() => {
     const tk = lerTokens()
-    const ordenado = [...dados].reverse()
 
     // a rampa cobre só os itens ordinais; os neutros saem da conta
     const nOrdinais = dados.filter((d) => !d.neutro).length
@@ -120,6 +128,15 @@ export function RankingSimples({
                     ? tk.textMuted
                     : corOrdinal(posOrdinal.get(d.rotulo) ?? 0),
               borderRadius: MARCA.barraDireita4px,
+              /**
+               * ESMAECE O NÃO-SELECIONADO EM VEZ DE ESCONDÊ-LO.
+               *
+               * Filtrar a lista deixaria o painel com uma barra só e apagaria a
+               * referência: não dá para ver que Canoas é a terceira de seis se
+               * as outras cinco sumiram. Mantendo-as a 25%, o recorte fica
+               * óbvio e o contexto continua legível.
+               */
+              opacity: selecionado && d.rotulo !== selecionado ? 0.25 : 1,
             },
           })),
           barMaxWidth: 16,
@@ -135,8 +152,20 @@ export function RankingSimples({
         },
       ],
     }
-  }, [dados, unidade, escala])
+  }, [dados, ordenado, unidade, escala, selecionado])
 
   const h = altura ?? Math.max(140, dados.length * 26 + 24)
-  return <Chart option={option} altura={h} aria-label="Ranking por volume" />
+  return (
+    <Chart
+      option={option}
+      altura={h}
+      aria-label="Ranking por volume"
+      aoClicar={
+        aoClicar ? (i) => {
+          const r = ordenado[i]?.rotulo
+          if (r) aoClicar(r)
+        } : undefined
+      }
+    />
+  )
 }

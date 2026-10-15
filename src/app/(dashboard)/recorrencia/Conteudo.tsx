@@ -1,8 +1,8 @@
 'use client'
 
-import { useMemo } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { parsearFiltros } from '@/lib/filtros'
+import { useCallback, useMemo } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { CLASSE_REC_POR_CODIGO, parsearFiltros, type CodigoClasseRec } from '@/lib/filtros'
 import { useRecorrencia } from '@/lib/useIndicador'
 import { Painel } from '@/components/Painel'
 import { StatTile } from '@/components/kpi/StatTile'
@@ -32,12 +32,78 @@ import { fmtFracaoPct, fmtInt } from '@/lib/formato'
  */
 export function RecorrenciaConteudo() {
   const sp = useSearchParams()
+  const router = useRouter()
   const filtros = useMemo(() => parsearFiltros(Object.fromEntries(sp.entries())), [sp])
+
+  /**
+   * CROSS-FILTER: clicar numa barra escreve o filtro NA URL, não num estado
+   * local do React.
+   *
+   * Pedido da Manutencao em 15/10/2026 -- "ao selecionar Canoas, so os
+   * recorrentes, bairros e catalogo de Canoas". Isso exige que o SERVIDOR
+   * reagregue: nao da para derivar "os bairros de Canoas" a partir dos totais
+   * por bairro que ja vieram somados de todas as cidades.
+   *
+   * Indo para a URL, tres coisas saem de graca: a barra de filtros no topo
+   * mostra o recorte ativo e sabe limpa-lo, o botao voltar do navegador desfaz,
+   * e o link copiado leva o colega para a mesma tela. Um `useState` daria o
+   * filtro visual e nenhuma das tres.
+   *
+   * Clicar de novo no mesmo rotulo desliga -- e o que a barra ja faz, e e o que
+   * se espera de um recorte aplicado por clique.
+   */
+  const alternar = useCallback(
+    (chave: 'cidade' | 'bairro' | 'catalogo' | 'classeRec', valor: string) => {
+      const q = new URLSearchParams(sp.toString())
+      if (q.get(chave) === valor) q.delete(chave)
+      else q.set(chave, valor)
+      router.replace(`/recorrencia?${q.toString()}`, { scroll: false })
+    },
+    [router, sp]
+  )
+
+  /**
+   * So destaca quando o recorte e de UM valor. Com dois ou mais -- possivel
+   * pela barra de filtros, que e multissselecao -- esmaecer "todos menos um"
+   * mentiria sobre o que esta aplicado; ai nenhum fica em foco e as barras ja
+   * mostram apenas o que sobrou.
+   */
+  const emFoco = (chave: 'cidade' | 'bairro' | 'catalogo') => {
+    const v = filtros[chave]
+    return v?.length === 1 ? v[0]! : null
+  }
+
+  /** rótulo da classe em recorte, ou null — o painel é o próprio controle */
+  const classeEmFoco = filtros.classeRec
+    ? CLASSE_REC_POR_CODIGO[filtros.classeRec]
+    : null
+  const codigoDaClasse = (rotulo: string): CodigoClasseRec | undefined =>
+    (Object.keys(CLASSE_REC_POR_CODIGO) as CodigoClasseRec[]).find(
+      (k) => CLASSE_REC_POR_CODIGO[k] === rotulo
+    )
 
   const q = useRecorrencia(filtros)
   const d = q.data?.data
   const t = d?.total
   const erro = q.error ? String(q.error.message) : null
+
+  /**
+   * ⚠️ TODO CAMPO DE `d` É LIDO COM `?? []`, mesmo os que "sempre existem".
+   *
+   * `d && (...)` garante que a resposta chegou, não que ela tem o formato de
+   * hoje. Em 15/10/2026, ao acrescentar `porBairro`, a tela quebrou inteira com
+   * "d.porBairro is not iterable": o componente já era o novo, mas a resposta
+   * vinha do CACHE DE INDICADOR, gravada antes da mudança e sem o campo.
+   *
+   * O mesmo acontece em qualquer janela entre o deploy do servidor e a
+   * expiração do cache, e também se alguém abrir a aba com o bundle novo contra
+   * um servidor ainda antigo. O custo de errar é desproporcional: um campo
+   * ausente derrubava a PÁGINA TODA, inclusive os painéis que tinham dados.
+   *
+   * Com o `?? []`, o painel novo nasce vazio e o resto da tela continua de pé —
+   * mesma escolha de degradação já feita no controle de acesso, que fica
+   * inativo em vez de derrubar o dashboard.
+   */
 
   /** Saúde da ponte do PPPoE — se muitos protocolos caem no fallback, a chave
    *  por login perde precisão e o número muda de significado. */
@@ -52,10 +118,12 @@ export function RecorrenciaConteudo() {
         role="note"
       >
         <strong>Recorrente</strong> = o login voltou a abrir chamado em{' '}
-        <em>todas</em> as janelas consecutivas — em até 30 dias, e também entre
-        31 e 60, e também entre 61 e 90. É problema <strong>crônico</strong>, não
-        repetição eventual: quem voltou uma vez só não entra aqui. Preventivas
-        nunca contam, nem como chamado atual nem como anterior.{' '}
+        <strong>até 30 dias</strong>. Isso vale para os três baldes; o que muda
+        entre eles é <em>quantas janelas consecutivas</em> tiveram retorno —{' '}
+        <em>Recorrente 30</em> voltou só na janela recente, <em>60</em> voltou
+        também entre 31 e 60 dias, e <em>90</em> voltou nas três. Quanto mais
+        janelas, mais crônico. Preventivas nunca contam, nem como chamado atual
+        nem como anterior.{' '}
         A unidade é <strong>login-mês</strong>: a chave é o{' '}
         <strong>login PPPoE</strong>, não o cliente — um cliente corporativo com
         vários logins em cidades diferentes não vira recorrente por isso. Cada
@@ -76,10 +144,17 @@ export function RecorrenciaConteudo() {
           subirEhRuim
           destaque
         />
+        {/*
+          ⚠️ "voltaram em todas as janelas" estava AQUI e era FALSO para 114 dos
+          125 — a Manutenção pegou em 15/10/2026: *"dá a entender que os 125
+          estão em 30, 60 e 90 dias e isso não é real"*. Só a classe Recorrente
+          90 cumpre as três; em setembro/2026 ela tem UM login. O que os 125
+          têm em comum é o piso: todos voltaram em até 30 dias.
+        */}
         <StatTile
-          rotulo="Logins crônicos"
+          rotulo="Logins com retorno"
           valor={q.isLoading ? '…' : fmtInt(t?.recorrentes)}
-          contexto="voltaram em todas as janelas"
+          contexto="voltaram a abrir em até 30 dias"
           subirEhRuim
         />
         <StatTile
@@ -114,13 +189,21 @@ export function RecorrenciaConteudo() {
 
       <Painel
         titulo="Classificação de recorrência"
-        descricao="Cumulativa: exige chamado em todas as janelas até ali. As classes são exclusivas entre si."
+        descricao="Todas voltaram em até 30 dias. A classe diz até que janela a volta se repetiu — são exclusivas entre si."
         carregando={q.isLoading}
         erro={erro}
         nota={
-          q.data
-            ? `Exclui os protocolos com categoria 5 = “Solucao Interna” · consulta em ${fmtInt(q.data.meta.ms)} ms`
-            : 'Exclui os protocolos com categoria 5 = “Solucao Interna”'
+          classeEmFoco ? (
+            <>
+              Recorte ativo: <strong>{classeEmFoco}</strong> — cidade, bairro e
+              catálogo abaixo mostram só estes. Clique na mesma barra para
+              remover.
+            </>
+          ) : q.data ? (
+            `Exclui os protocolos com categoria 5 = “Solucao Interna” · consulta em ${fmtInt(q.data.meta.ms)} ms`
+          ) : (
+            'Exclui os protocolos com categoria 5 = “Solucao Interna”'
+          )
         }
         tabela={{
           colunas: [
@@ -137,7 +220,7 @@ export function RecorrenciaConteudo() {
       >
         {d && (
           <RankingSimples
-            dados={d.porClasseRecorrencia.map((x) => ({
+            dados={(d.porClasseRecorrencia ?? []).map((x) => ({
               rotulo: x.classe,
               valor: x.clientes,
               share: x.share,
@@ -147,6 +230,11 @@ export function RecorrenciaConteudo() {
             unidade="reparos-mês"
             escala="ordinal"
             altura={150}
+            aoClicar={(r) => {
+              const cod = codigoDaClasse(r)
+              if (cod) alternar('classeRec', cod)
+            }}
+            selecionado={classeEmFoco}
           />
         )}
       </Painel>
@@ -177,7 +265,7 @@ export function RecorrenciaConteudo() {
         >
           {d && (
             <RankingSimples
-              dados={[...d.porCidade]
+              dados={[...(d.porCidade ?? [])]
                 .sort((a, b) => b.recorrentes - a.recorrentes)
                 .slice(0, 10)
                 .map((x) => ({
@@ -185,7 +273,9 @@ export function RecorrenciaConteudo() {
                   valor: x.recorrentes,
                   detalhe: `${fmtInt(x.clientes)} reparos-mês · taxa ${fmtFracaoPct(x.taxaRecorrencia, 1)}`,
                 }))}
-              unidade="logins crônicos"
+              unidade="logins recorrentes"
+              aoClicar={(r) => alternar('cidade', r)}
+              selecionado={emFoco('cidade')}
             />
           )}
         </Painel>
@@ -231,7 +321,7 @@ export function RecorrenciaConteudo() {
         >
           {d && (
             <RankingSimples
-              dados={[...d.porCatalogo]
+              dados={[...(d.porCatalogo ?? [])]
                 .sort((a, b) => b.recorrentes - a.recorrentes)
                 .slice(0, 10)
                 .map((x) => ({
@@ -239,7 +329,9 @@ export function RecorrenciaConteudo() {
                   valor: x.recorrentes,
                   detalhe: `${fmtInt(x.clientes)} reparos-mês · taxa ${fmtFracaoPct(x.taxaRecorrencia, 1)}`,
                 }))}
-              unidade="logins crônicos"
+              unidade="logins recorrentes"
+              aoClicar={(r) => alternar('catalogo', r)}
+              selecionado={emFoco('catalogo')}
             />
           )}
         </Painel>
@@ -275,7 +367,7 @@ export function RecorrenciaConteudo() {
       >
         {d && (
           <RankingSimples
-            dados={[...d.porBairro]
+            dados={[...(d.porBairro ?? [])]
               .sort((a, b) => b.recorrentes - a.recorrentes)
               .slice(0, 15)
               .map((x) => ({
@@ -283,7 +375,9 @@ export function RecorrenciaConteudo() {
                 valor: x.recorrentes,
                 detalhe: `${fmtInt(x.clientes)} reparos-mês · taxa ${fmtFracaoPct(x.taxaRecorrencia, 1)}`,
               }))}
-            unidade="logins crônicos"
+            unidade="logins recorrentes"
+            aoClicar={(r) => alternar('bairro', r)}
+            selecionado={emFoco('bairro')}
           />
         )}
       </Painel>
@@ -310,12 +404,12 @@ export function RecorrenciaConteudo() {
           }}
         >
           <RankingSimples
-            dados={d.porMes.map((x) => ({
+            dados={(d.porMes ?? []).map((x) => ({
               rotulo: x.mes,
               valor: x.recorrentes,
               detalhe: `${fmtInt(x.clientes)} reparos-mês · taxa ${fmtFracaoPct(x.taxaRecorrencia, 1)}`,
             }))}
-            unidade="logins crônicos"
+            unidade="logins recorrentes"
           />
         </Painel>
       )}
