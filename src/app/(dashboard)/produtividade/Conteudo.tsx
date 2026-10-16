@@ -300,8 +300,7 @@ export function ProdutividadeConteudo() {
             {fmtFracaoPct(t.visitasComRegistro / t.totalVisitas, 1)} de lá é maior porque
             soma também as {fmtInt(t.visitasComRegistro - t.visitasComDupla)} visitas em
             que o técnico <em>declarou ter ido sozinho</em> — cumpriu o processo, só não
-            há crédito de dupla para dar. Na Instalação, que é aderente, o registro cobre
-            97% das visitas, então a diferença aqui é de processo, não de fonte.{' '}
+            há crédito de dupla para dar.{' '}
           </>
         )}
         <strong>Sem total geral de propósito</strong>: somar os técnicos passaria do
