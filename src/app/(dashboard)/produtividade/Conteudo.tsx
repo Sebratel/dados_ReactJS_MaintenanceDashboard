@@ -388,6 +388,19 @@ export function ProdutividadeConteudo() {
             { chave: 'semAcao', rotulo: 'Sem ação', alinhar: 'dir' },
             { chave: 'aux', rotulo: 'Como auxiliar', alinhar: 'dir' },
             { chave: 'assertiv', rotulo: 'Assertiv. campo', alinhar: 'dir' },
+            /*
+              DIAS TRABALHADOS FICA COLADO EM Ativ./dia PORQUE É O DENOMINADOR
+              DELE: produtivas ÷ dias = ativ./dia, e as três colunas lado a lado
+              deixam a conta conferível na própria linha.
+
+              "Trabalhados" aqui é dia com ao menos um PRODUTIVO, não dia de
+              escala: quem foi a campo e só perdeu visitas não aparece com dia
+              trabalhado. É o mesmo denominador do cartão "Média diária
+              produtivos" — com uma diferença: lá o dia só conta para o TITULAR,
+              aqui conta também o dia em que a pessoa foi auxiliar, porque esta
+              coluna fala da produção individual dela.
+            */
+            { chave: 'dias', rotulo: 'Dias trabalhados', alinhar: 'dir' },
             { chave: 'media', rotulo: 'Ativ./dia', alinhar: 'dir' },
           ],
           linhas: tecnicos.map((x) => ({
@@ -397,6 +410,7 @@ export function ProdutividadeConteudo() {
             improdutivo: fmtInt(x.improdutivo),
             semAcao: fmtInt(x.semAcao),
             assertiv: fmtFracaoPct(x.assertividadeCampo, 1),
+            dias: fmtInt(x.diasProdutivos),
             media: fmtDec(x.mediaDiaria),
           })),
         }}
