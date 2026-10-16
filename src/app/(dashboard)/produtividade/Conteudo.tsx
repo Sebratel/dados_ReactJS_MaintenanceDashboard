@@ -310,7 +310,22 @@ export function ProdutividadeConteudo() {
 
       <Painel
         titulo="Produção por técnico"
-        descricao="Rótulo à direita = assertividade de campo. Barra = volume e mix."
+        /*
+          O SUBTÍTULO PRECISA DIZER POR QUE A LISTA ESTÁ NESSA ORDEM.
+          Relato da Manutenção em 16/10/2026: "o primeiro está ordenado do maior
+          para o menor, os demais não sei qual a regra". As três ordenações
+          sempre estiveram corretas — o que faltava era a tela anunciar o
+          critério. Em "Produção" ele é visível (a barra verde), nas outras duas
+          não era: assertividade está no rótulo e visitas perdidas não aparecia
+          em lugar nenhum.
+        */
+        descricao={
+          ordem === 'produtivo'
+            ? `Ordenado por produção, ${decrescente ? 'maior → menor' : 'menor → maior'}. Rótulo à direita = assertividade de campo. Barra = volume e mix.`
+            : ordem === 'assertividade'
+              ? `Ordenado por assertividade, ${decrescente ? 'maior → menor' : 'menor → maior'} — é o próprio rótulo à direita. Barra = volume e mix.`
+              : `Ordenado por visitas perdidas, ${decrescente ? 'maior → menor' : 'menor → maior'} — a fatia vermelha. O rótulo à direita traz quantas foram, e a assertividade ao lado.`
+        }
         carregando={q.isLoading}
         erro={erro}
         nota={
@@ -443,6 +458,7 @@ export function ProdutividadeConteudo() {
               assertividadeCampo: x.assertividadeCampo,
             }))}
             rotuloEixo="Técnico"
+            realce={ordem === 'improdutivo' ? 'improdutivo' : 'assertividade'}
           />
         )}
       </Painel>

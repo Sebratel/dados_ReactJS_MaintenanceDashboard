@@ -40,9 +40,21 @@ export function RankingComposto({
   dados,
   altura,
   rotuloEixo = 'Categoria',
+  realce = 'assertividade',
 }: {
   dados: ItemComposto[]
   altura?: number
+  /**
+   * O QUE O RÓTULO DA DIREITA MOSTRA — e, por tabela, qual critério de
+   * ordenação o gráfico está anunciando.
+   *
+   * Nasceu de um relato da Manutenção em 16/10/2026: ordenando por "Visitas
+   * perdidas", a lista parecia fora de ordem. Estava ordenada certo — pelo
+   * número de improdutivas —, só que NADA na tela mostrava esse número: o
+   * comprimento da barra é o total e o rótulo era sempre a assertividade.
+   * Ordenar por uma grandeza invisível lê como defeito, mesmo correto.
+   */
+  realce?: 'assertividade' | 'improdutivo'
   rotuloEixo?: string
 }) {
   const option = useMemo(() => {
@@ -80,8 +92,12 @@ export function RankingComposto({
             label: {
               show: true,
               position: 'right' as const,
-              formatter: (p: { dataIndex: number }) =>
-                fmtFracaoPct(ordenado[p.dataIndex]?.assertividadeCampo, 0),
+              formatter: (p: { dataIndex: number }) => {
+                const d = ordenado[p.dataIndex]
+                const pct = fmtFracaoPct(d?.assertividadeCampo, 0)
+                // ordenando por visitas perdidas, o número que ordena vem junto
+                return realce === 'improdutivo' ? `${fmtInt(d?.improdutivo ?? 0)} · ${pct}` : pct
+              },
               color: tk.textSecondary,
               fontSize: 11,
               fontWeight: 600 as const,
@@ -91,7 +107,7 @@ export function RankingComposto({
     })
 
     return {
-      grid: baseGrid(tk, { left: 4, right: 56, top: 24, bottom: 4 }),
+      grid: baseGrid(tk, { left: 4, right: realce === 'improdutivo' ? 96 : 56, top: 24, bottom: 4 }),
       tooltip: baseTooltip(tk, {
         trigger: 'axis',
         axisPointer: { type: 'shadow', shadowStyle: { color: `${tk.textMuted}14` } },
@@ -140,7 +156,7 @@ export function RankingComposto({
         serie('Sem ação', tk.statusWarning, (d) => d.semAcao, true),
       ],
     }
-  }, [dados, rotuloEixo])
+  }, [dados, rotuloEixo, realce])
 
   const h = altura ?? Math.max(160, dados.length * 26 + 40)
   return (
