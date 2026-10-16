@@ -54,8 +54,29 @@ describe('cifrar/decifrar', () => {
   it('recusa blob adulterado — é isso que o GCM acrescenta ao AES', () => {
     const blob = cifrar('chave-original')
     const [iv, tag, dados] = blob.split('.') as [string, string, string]
-    // troca um caractere dos dados cifrados
-    const mexido = dados.slice(0, -2) + (dados.endsWith('A') ? 'B' : 'A') + dados.slice(-1)
+    /*
+     * ⚠️ ADULTERAR O BYTE, NUNCA O CARACTERE BASE64 — ESTE TESTE JÁ FOI INSTÁVEL.
+     *
+     * A versão anterior trocava o penúltimo caractere por 'A' e decidia isso
+     * olhando `dados.endsWith('A')`, que é o ÚLTIMO caractere — e o último é
+     * sempre '=' para este tamanho de texto. Resultado: quando o penúltimo já
+     * era 'A', a "adulteração" não mexia em nada, o blob abria normalmente e o
+     * teste falhava. Caía em ~6% das execuções (1/16, a chance de o caractere
+     * ser 'A'), achado em 16/10/2026 depois de três quedas em ~36 rodadas.
+     *
+     * Há uma segunda armadilha no mesmo lugar: num grupo base64 incompleto os
+     * bits finais são ENCHIMENTO. Trocar aquele caractere por outro do mesmo
+     * quarteto ('A'/'B'/'C'/'D') decodifica para os MESMOS bytes — o blob
+     * continuaria íntegro mesmo com o texto diferente.
+     *
+     * Por isso o teste desce ao byte: inverte o primeiro, que é dado de verdade
+     * em qualquer tamanho, e confere que o texto mudou antes de exigir a recusa.
+     * Teste que às vezes não testa nada é pior que teste ausente — ele dá aval.
+     */
+    const bytes = Buffer.from(dados, 'base64')
+    bytes[0] ^= 0xff
+    const mexido = bytes.toString('base64')
+    expect(mexido).not.toBe(dados) // a adulteração aconteceu mesmo
     expect(decifrar(`${iv}.${tag}.${mexido}`)).toBeNull()
   })
 
