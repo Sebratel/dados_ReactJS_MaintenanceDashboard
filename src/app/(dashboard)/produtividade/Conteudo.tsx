@@ -281,11 +281,27 @@ export function ProdutividadeConteudo() {
         herda a improdutiva de um dia em que não esteve.{' '}
         {t && t.visitasComDupla > 0 && (
           <>
-            No recorte, <strong>{fmtInt(t.visitasComDupla)}</strong> de{' '}
-            {fmtInt(t.totalVisitas)} visitas têm auxiliar identificado (
-            {fmtFracaoPct(t.visitasComDupla / t.totalVisitas, 0)}) — na Instalação,
-            que é aderente, o registro cobre 97% das visitas, então a diferença aqui
-            é de processo, não de fonte.{' '}
+            {/*
+              ⚠️ ESTA FRASE E O CARTÃO "Registro da dupla" MOSTRAM PERCENTUAIS
+              DIFERENTES SOBRE O MESMO ASSUNTO, e por isso ela precisa citar o
+              cartão em vez de fingir que ele não existe. Aqui é COBERTURA DO
+              CRÉDITO (tem auxiliar para creditar); lá é ADESÃO AO PROCESSO
+              (registrou alguma coisa, inclusive "fui sozinho"). O numerador é o
+              mesmo; o cartão só soma mais um pedaço.
+
+              Reportado pela Manutenção em 16/10/2026 — leu 15% no texto e 24,7%
+              no cartão, a três cartões de distância, sem nada ligando os dois.
+            */}
+            No recorte, <strong>{fmtInt(t.visitasComDupla)}</strong> das{' '}
+            {fmtInt(t.totalVisitas)} visitas — produtivas + improdutivas + sem ação —
+            têm auxiliar identificado, {fmtFracaoPct(t.visitasComDupla / t.totalVisitas, 0)}.
+            São os mesmos {fmtInt(t.visitasComDupla)} do cartão{' '}
+            <strong>Registro da dupla</strong>: o{' '}
+            {fmtFracaoPct(t.visitasComRegistro / t.totalVisitas, 1)} de lá é maior porque
+            soma também as {fmtInt(t.visitasComRegistro - t.visitasComDupla)} visitas em
+            que o técnico <em>declarou ter ido sozinho</em> — cumpriu o processo, só não
+            há crédito de dupla para dar. Na Instalação, que é aderente, o registro cobre
+            97% das visitas, então a diferença aqui é de processo, não de fonte.{' '}
           </>
         )}
         <strong>Sem total geral de propósito</strong>: somar os técnicos passaria do
