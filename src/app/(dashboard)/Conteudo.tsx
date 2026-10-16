@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { parsearFiltros } from '@/lib/filtros'
+import { projetarMes } from '@/lib/projecao'
 import {
   useCoeficiente,
   useKpis,
@@ -18,6 +19,7 @@ import { RankingBarras } from '@/components/charts/RankingBarras'
 import { CoeficienteVsMeta } from '@/components/charts/CoeficienteVsMeta'
 import {
   fmtData,
+  fmtDec,
   fmtFracaoPct,
   fmtHoras,
   fmtInt,
@@ -51,6 +53,25 @@ export function VisaoExecutivaConteudo() {
     [...(coef.data?.data ?? [])].reverse().find((p) => p.baseClientes !== null)?.baseClientes ??
     null
   const taxaEntrantes = k && baseClientes ? k.protocolos / baseClientes : null
+
+  /**
+   * PROJEÇÃO DO MÊS — a regra inteira mora em `lib/projecao.ts`, com testes.
+   *
+   * Sai da série de `coef`, e não de `k.protocolos`, de propósito: a projeção é
+   * de ENTRANTES, e aquela série é sempre por criação e já restrita à região
+   * quando a base de clientes é regional. Numerador e denominador saindo da
+   * mesma fonte é o que impede o cartão de discordar do painel logo abaixo.
+   *
+   * `projetarMes` devolve `null` fora de um recorte do mês corrente — e aí o
+   * cartão simplesmente não existe, em vez de mostrar um número que seria o
+   * próprio realizado com outro nome.
+   */
+  const projecao = useMemo(() => {
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const d = new Date()
+    const hoje = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    return projetarMes(coef.data?.data ?? [], filtros.de, filtros.ate, hoje)
+  }, [coef.data, filtros.de, filtros.ate])
 
   return (
     <div className="mx-auto flex max-w-[1600px] flex-col gap-4">
@@ -97,6 +118,18 @@ export function VisaoExecutivaConteudo() {
               : undefined
           }
         />
+        {projecao && (
+          <StatTile
+            rotulo="Projeção do mês"
+            valor={fmtInt(projecao.entrantes)}
+            subirEhRuim
+            contexto={
+              baseClientes
+                ? `${fmtFracaoPct(projecao.entrantes / baseClientes, 2)} da base · ${fmtDec(projecao.mediaDiaria)}/dia em ${fmtInt(projecao.diasCompletos)} dias cheios`
+                : `${fmtDec(projecao.mediaDiaria)}/dia em ${fmtInt(projecao.diasCompletos)} dias cheios`
+            }
+          />
+        )}
         <StatTile
           rotulo="MTTR médio"
           valor={kpis.isLoading ? '…' : fmtHoras(k?.mttrHoras)}
