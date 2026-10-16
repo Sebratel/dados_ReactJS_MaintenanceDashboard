@@ -14,6 +14,7 @@ import type { ResultadoProdutividade } from '@/server/indicadores/produtividade'
 import type { ResultadoRecorrencia } from '@/server/indicadores/recorrencia'
 import type { ResultadoPreventivos } from '@/server/indicadores/preventivos'
 import type { ResultadoOfensores } from '@/server/indicadores/ofensores'
+import type { ResultadoHistorico } from '@/server/indicadores/historico'
 import type { LinhaProtocolo } from '@/server/indicadores/protocolos'
 
 export type Envelope<T, M = Record<string, unknown>> = {
@@ -301,5 +302,21 @@ export function useOpcoesFiltro(f: Filtros) {
     staleTime: 30 * 60_000,
     gcTime: 60 * 60_000,
     placeholderData: (anterior) => anterior,
+  })
+}
+
+/**
+ * Série mensal sobre a base de clientes — a tela de Histórico.
+ *
+ * Custa pouco (agregação por mês, sem janela) mas cruza os dois bancos, então
+ * o TTL de servidor é alto: a base do Data Hub muda uma vez por dia.
+ */
+export function useHistorico(f: Filtros) {
+  return useQuery({
+    queryKey: chave('historico', f),
+    queryFn: () =>
+      buscar<ResultadoHistorico['data'], ResultadoHistorico['meta']>('historico', f),
+    refetchInterval: 1_800_000,
+    staleTime: 300_000,
   })
 }

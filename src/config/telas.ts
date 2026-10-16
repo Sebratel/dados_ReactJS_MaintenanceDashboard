@@ -77,6 +77,12 @@ export const TELAS = [
     contem: 'Ranking de retorno por técnico, NOMINAL, com denominador.',
   },
   {
+    id: 'historico',
+    caminho: '/historico',
+    rotulo: 'Histórico',
+    contem: 'Série mensal de volume contra a base de clientes.',
+  },
+  {
     id: 'protocolos',
     caminho: '/protocolos',
     rotulo: 'Protocolos',
@@ -131,10 +137,11 @@ export const TELAS_POR_INDICADOR: Record<string, readonly IdTela[]> = {
   recorrencia: ['recorrencia'],
   preventivos: ['preventivos'],
   ofensores: ['ofensores'],
+  historico: ['historico'],
   /**
    * As opções dos combos alimentam a barra de filtros, que existe em TODAS as
    * telas. Quem entrou no dashboard já pode vê-las: são nomes de cidade, equipe
    * e catálogo — o mesmo que a barra de filtros mostra desde sempre.
    */
-  opcoes: ['executivo', 'operacao', 'tempos', 'produtividade', 'recorrencia', 'preventivos', 'ofensores', 'protocolos'],
+  opcoes: ['executivo', 'operacao', 'tempos', 'produtividade', 'recorrencia', 'preventivos', 'ofensores', 'historico', 'protocolos'],
 }

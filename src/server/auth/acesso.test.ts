@@ -10,6 +10,17 @@ import {
   salvarTela,
   salvarUsuario,
 } from './acesso'
+import { TELAS } from '@/config/telas'
+
+/**
+ * ⚠️ O NÚMERO DE TELAS SAI DO CATÁLOGO, NUNCA LITERAL.
+ *
+ * Estes testes diziam "as 8 telas" e quebravam os 7 de uma vez toda vez que
+ * uma aba nova entrava — foi o que aconteceu em 16/10/2026 ao criar o
+ * Histórico. A asserção que importa é "todas as telas", não "oito": derivando
+ * de TELAS, a aba nova passa a ser coberta de graça em vez de dar trabalho.
+ */
+const TOTAL = TELAS.length
 
 /**
  * O controle de acesso, contra o sistema de arquivos DE VERDADE.
@@ -41,10 +52,10 @@ afterEach(() => {
 const arquivo = () => join(dir, 'acesso.json')
 
 describe('sem nada configurado', () => {
-  it('todo mundo vê as 8 telas, como antes do controle existir', () => {
+  it('todo mundo vê todas as telas, como antes do controle existir', () => {
     const a = resolverAcesso('alguem@sebratel.com.br')
     expect(a.papel).toBe('viewer')
-    expect(a.telas.size).toBe(8)
+    expect(a.telas.size).toBe(TOTAL)
     expect(a.controleAtivo).toBe(true)
   })
 
@@ -91,9 +102,9 @@ describe('papéis', () => {
 })
 
 describe('matriz de telas', () => {
-  it('começa com as 8 em modo todos', () => {
+  it('começa com todas em modo todos', () => {
     const m = lerMatriz()
-    expect(m).toHaveLength(8)
+    expect(m).toHaveLength(TOTAL)
     expect(m.every((t) => t.modo === 'todos' && t.emails.length === 0)).toBe(true)
   })
 
@@ -104,8 +115,8 @@ describe('matriz de telas', () => {
 
     const naoPode = resolverAcesso('outra@sebratel.com.br')
     expect(naoPode.telas.has('produtividade')).toBe(false)
-    // as outras 7 continuam visíveis: restringir uma não tranca o dashboard
-    expect(naoPode.telas.size).toBe(7)
+    // as outras continuam visíveis: restringir uma não tranca o dashboard
+    expect(naoPode.telas.size).toBe(TOTAL - 1)
   })
 
   it('administrador vê tela restrita mesmo fora da lista', () => {
@@ -162,13 +173,13 @@ describe('arquivo torto', () => {
   it('JSON corrompido cai no padrão em vez de lançar', () => {
     writeFileSync(arquivo(), '{ isto não é json', 'utf8')
     const a = resolverAcesso('alguem@sebratel.com.br')
-    expect(a.telas.size).toBe(8)
+    expect(a.telas.size).toBe(TOTAL)
     expect(a.papel).toBe('viewer')
   })
 
   it('arquivo vazio cai no padrão', () => {
     writeFileSync(arquivo(), '', 'utf8')
-    expect(resolverAcesso('alguem@sebratel.com.br').telas.size).toBe(8)
+    expect(resolverAcesso('alguem@sebratel.com.br').telas.size).toBe(TOTAL)
   })
 
   it('papel desconhecido NÃO vira admin', () => {
@@ -186,8 +197,8 @@ describe('arquivo torto', () => {
       JSON.stringify({ papeis: {}, telas: { inventada: { modo: 'lista', emails: [] } } }),
       'utf8'
     )
-    expect(lerMatriz().map((t) => t.tela)).toHaveLength(8)
-    expect(resolverAcesso('alguem@sebratel.com.br').telas.size).toBe(8)
+    expect(lerMatriz().map((t) => t.tela)).toHaveLength(TOTAL)
+    expect(resolverAcesso('alguem@sebratel.com.br').telas.size).toBe(TOTAL)
   })
 
   it('campo com tipo errado não quebra a leitura', () => {
@@ -216,6 +227,6 @@ describe('diretório de dados indisponível', () => {
 
     const a = resolverAcesso('alguem@sebratel.com.br')
     expect(a.controleAtivo).toBe(false)
-    expect(a.telas.size).toBe(8)
+    expect(a.telas.size).toBe(TOTAL)
   })
 })

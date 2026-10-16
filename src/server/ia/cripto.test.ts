@@ -74,7 +74,9 @@ describe('cifrar/decifrar', () => {
      * Teste que às vezes não testa nada é pior que teste ausente — ele dá aval.
      */
     const bytes = Buffer.from(dados, 'base64')
-    bytes[0] ^= 0xff
+    // readUInt8/writeUInt8 e não `bytes[0] ^= 0xff`: com
+    // `noUncheckedIndexedAccess` o índice é `number | undefined`
+    bytes.writeUInt8(bytes.readUInt8(0) ^ 0xff, 0)
     const mexido = bytes.toString('base64')
     expect(mexido).not.toBe(dados) // a adulteração aconteceu mesmo
     expect(decifrar(`${iv}.${tag}.${mexido}`)).toBeNull()

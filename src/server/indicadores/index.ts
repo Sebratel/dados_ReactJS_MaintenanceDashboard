@@ -10,6 +10,7 @@ import { obterProdutividade } from './produtividade'
 import { obterRecorrencia } from './recorrencia'
 import { obterPreventivos } from './preventivos'
 import { obterOfensores } from './ofensores'
+import { obterHistorico } from './historico'
 
 type Resultado = { data: unknown; meta?: unknown; ms: number }
 
@@ -35,6 +36,9 @@ export const INDICADORES = {
   recorrencia: { tier: 1, cacheSegundos: 600, fn: obterRecorrencia },
   preventivos: { tier: 1, cacheSegundos: 600, fn: obterPreventivos },
   ofensores: { tier: 1, cacheSegundos: 600, fn: obterOfensores },
+  // série mensal + base de clientes: o dado muda uma vez por dia (a carga
+  // do Data Hub), então TTL alto não esconde nada de ninguém
+  historico: { tier: 1, cacheSegundos: 900, fn: obterHistorico },
 } satisfies Record<
   string,
   { tier: 1 | 2; cacheSegundos: number; fn: (f: Filtros) => Promise<Resultado> }
