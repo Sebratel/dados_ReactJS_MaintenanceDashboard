@@ -142,9 +142,21 @@ export type ItemTecnico = MedidasProdutividade & {
   tecnico: string
   /** quanto da produção veio como auxiliar da dupla */
   comoAuxiliar: number
-  /** dias distintos em que o técnico teve ao menos um produtivo */
-  diasProdutivos: number
-  /** Produtivo ÷ dias produtivos — a "média diária de reparos" do Power BI */
+  /**
+   * Dias distintos em que o técnico teve ao menos UMA VISITA, produtiva ou não.
+   *
+   * ⚠️ NÃO É DIA DE ESCALA e não é dia produtivo. É dia em que houve
+   * atendimento registrado — se o técnico saiu e todas as visitas foram
+   * improdutivas, o dia conta assim mesmo (Manutenção, 16/10/2026).
+   *
+   * ⚠️ SOMAR ESTA COLUNA NÃO DÁ O DENOMINADOR DO CARTÃO "Média diária
+   * produtivos". São dois recortes diferentes, de propósito: o cartão conta o
+   * dia só para o TITULAR e só quando houve produtivo, porque reproduz a medida
+   * do Power BI; esta coluna conta o dia de quem esteve lá, inclusive como
+   * auxiliar, porque fala da produção individual.
+   */
+  diasTrabalhados: number
+  /** Produtivo ÷ dias trabalhados — a média individual da pessoa */
   mediaDiaria: number | null
   /**
    * Improdutivas do técnico quebradas por família de motivo, para a tela poder
@@ -617,9 +629,23 @@ export async function obterProdutividade(f: Filtros): Promise<ResultadoProdutivi
           auxiliar: 0,
         }
       acumular(tec, r, n)
+      /*
+       * DIA TRABALHADO CONTA MESMO SEM PRODUZIR — decisão da Manutenção em
+       * 16/10/2026: "dia trabalhado independe se produziu ou não; se registrou
+       * um atendimento tem que contar; se não conseguiu fazer nenhum reparo com
+       * sucesso, faz parte".
+       *
+       * Antes o dia só entrava quando havia produtivo, e isso premiava
+       * justamente o pior caso: quem saiu, perdeu o dia inteiro em improdutivas
+       * e não fechou nada simplesmente não tinha aquele dia no denominador — a
+       * média dele subia por ter trabalhado pior. Agora o dia pesa.
+       */
+      tec.dias.add(r.dia)
       if (r.instalado) {
-        tec.dias.add(r.dia)
         if (r.papel === 'Auxiliar') tec.auxiliar += n
+        // O CARTÃO DO TIME NÃO MUDA: `diasComoPrincipal` segue contando só dia
+        // com produtivo, porque ele reproduz a medida `Média Reparos Produtivos
+        // Time` do Power BI, que filtra `Status = "Produtivo"` no DISTINCTCOUNT.
         else diasComoPrincipal.add(`${r.tecnico}|${r.dia}`)
       }
       if (r.improdutiva) {
@@ -672,7 +698,7 @@ export async function obterProdutividade(f: Filtros): Promise<ResultadoProdutivi
         tecnico,
         ...resto,
         comoAuxiliar: auxiliar,
-        diasProdutivos: dias.size,
+        diasTrabalhados: dias.size,
         mediaDiaria: dias.size > 0 ? resto.produtivo / dias.size : null,
         improdutivoPorGrupo: Object.fromEntries(porGrupo),
       }

@@ -393,12 +393,14 @@ export function ProdutividadeConteudo() {
               DELE: produtivas ÷ dias = ativ./dia, e as três colunas lado a lado
               deixam a conta conferível na própria linha.
 
-              "Trabalhados" aqui é dia com ao menos um PRODUTIVO, não dia de
-              escala: quem foi a campo e só perdeu visitas não aparece com dia
-              trabalhado. É o mesmo denominador do cartão "Média diária
-              produtivos" — com uma diferença: lá o dia só conta para o TITULAR,
-              aqui conta também o dia em que a pessoa foi auxiliar, porque esta
-              coluna fala da produção individual dela.
+              "Trabalhados" é dia com atendimento registrado, produtivo ou
+              não — dia em que a pessoa saiu e só perdeu visitas conta igual.
+              Não é dia de escala: dia sem nenhuma visita não aparece.
+
+              ⚠️ Somar esta coluna NÃO dá o denominador do cartão "Média diária
+              produtivos". Lá o dia só conta para o TITULAR e só quando houve
+              produtivo, porque o cartão reproduz a medida do Power BI; aqui
+              conta o dia de quem esteve lá, inclusive como auxiliar.
             */
             { chave: 'dias', rotulo: 'Dias trabalhados', alinhar: 'dir' },
             { chave: 'media', rotulo: 'Ativ./dia', alinhar: 'dir' },
@@ -410,7 +412,7 @@ export function ProdutividadeConteudo() {
             improdutivo: fmtInt(x.improdutivo),
             semAcao: fmtInt(x.semAcao),
             assertiv: fmtFracaoPct(x.assertividadeCampo, 1),
-            dias: fmtInt(x.diasProdutivos),
+            dias: fmtInt(x.diasTrabalhados),
             media: fmtDec(x.mediaDiaria),
           })),
         }}
