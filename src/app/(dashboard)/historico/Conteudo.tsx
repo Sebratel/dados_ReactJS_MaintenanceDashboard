@@ -7,7 +7,7 @@ import { useHistorico } from '@/lib/useIndicador'
 import { Painel } from '@/components/Painel'
 import { VolumeComCoeficiente } from '@/components/charts/VolumeComCoeficiente'
 import { RankingSimples } from '@/components/charts/RankingSimples'
-import { fmtFracaoPct, fmtInt } from '@/lib/formato'
+import { fmtFracaoPct, fmtInt, fmtMesCurto } from '@/lib/formato'
 import type { MetricaHistorico } from '@/server/indicadores/historico'
 
 /**
@@ -54,7 +54,9 @@ export function HistoricoConteudo() {
       (d?.porMes ?? []).map((p) => {
         const volume = p[metrica]
         return {
-          rotulo: p.mes,
+          // 'jan/26' no eixo: doze rótulos repetindo "2026-" gastam largura
+          // sem distinguir ponto nenhum
+          rotulo: fmtMesCurto(p.mes),
           volume,
           baseClientes: p.baseClientes,
           coeficiente: p.baseClientes ? volume / p.baseClientes : null,

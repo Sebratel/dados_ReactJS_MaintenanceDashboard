@@ -47,6 +47,25 @@ export function fmtHorasCurto(horas: number | null | undefined): string {
   return `${horas.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}h`
 }
 
+const MESES_CURTOS = [
+  'jan', 'fev', 'mar', 'abr', 'mai', 'jun',
+  'jul', 'ago', 'set', 'out', 'nov', 'dez',
+] as const
+
+/**
+ * "2026-01" → "jan/26".
+ *
+ * Eixo mensal com "2026-01" obriga a pessoa a traduzir número em mês a cada
+ * leitura, e doze rótulos iguais no prefixo ("2026-") gastam largura sem
+ * informar nada — o ano repetido não distingue ponto nenhum.
+ */
+export function fmtMesCurto(iso: string): string {
+  const [ano, mes] = iso.split('-')
+  const i = Number(mes) - 1
+  if (!ano || !MESES_CURTOS[i]) return iso
+  return `${MESES_CURTOS[i]}/${ano.slice(2)}`
+}
+
 /** "2026-08-05" → "05/08" (eixo) */
 export function fmtDiaCurto(iso: string): string {
   const [, m, d] = iso.split('-')

@@ -51,7 +51,7 @@ export function VolumeComCoeficiente({
     const n = dados.length
 
     return {
-      grid: baseGrid(tk, { top: 36, right: 8 }),
+      grid: baseGrid(tk, { top: 44, right: 8 }),
       tooltip: baseTooltip(tk, {
         trigger: 'axis',
         axisPointer: { type: 'shadow', shadowStyle: { color: `${tk.textMuted}14` } },
@@ -99,10 +99,24 @@ export function VolumeComCoeficiente({
           yAxisIndex: 0,
           data: dados.map((d) => d.volume),
           itemStyle: { color: tk.series[0], borderRadius: MARCA.barraTopo4px },
+          /*
+            RÓTULO DENTRO DA BARRA, e não em cima dela.
+            Com eixo duplo, a linha passa perto do topo das barras em escalas
+            que mudam a cada recorte — os dois rótulos em 'top' colidiam
+            ("2,76%" cobrindo "2.359"). Dentro da barra eles ficam separados
+            por construção, em qualquer escala.
+
+            `tk.surface` como cor do texto é o truque que funciona nos dois
+            temas: a barra usa a cor da série, e a superfície é sempre o
+            oposto dela em luminância — escura atrás de barra clara, clara
+            atrás de barra saturada.
+          */
           ...rotuloValor({
             n,
             formatter: (p) => fmtInt(p.value),
-            cor: tk.textSecondary,
+            cor: tk.surface,
+            position: 'insideTop',
+            distancia: 6,
           }),
         },
         {
@@ -120,6 +134,7 @@ export function VolumeComCoeficiente({
             n,
             formatter: (p) => (p.value === null ? '' : fmtFracaoPct(p.value, 2)),
             cor: tk.statusCritical,
+            distancia: 8,
           }),
         },
       ],

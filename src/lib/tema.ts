@@ -141,13 +141,26 @@ export function rotuloValor({
   cor,
   maximo = 60,
   position = 'top',
+  distancia,
 }: {
   /** quantos pontos a série tem */
   n: number
   formatter: (p: { value: number | null; dataIndex: number }) => string
   cor: string
   maximo?: number
-  position?: 'top' | 'inside'
+  /**
+   * `'insideTop'` existe para o caso de DUAS séries rotuladas no mesmo gráfico.
+   *
+   * Barra e linha com rótulo `'top'` colidem sempre que a linha passa perto do
+   * topo da barra — e com eixo duplo isso depende da escala, então não há
+   * `hideOverlap` que resolva: o ECharts esconderia um dos dois sem avisar, e o
+   * leitor não saberia qual sumiu. Jogar o da barra para DENTRO separa os dois
+   * por construção. Achado na tela de Histórico em 16/10/2026, onde "2,76%"
+   * cobria "2.359".
+   */
+  position?: 'top' | 'inside' | 'insideTop'
+  /** folga em px entre o rótulo e o ponto — útil para afastar séries vizinhas */
+  distancia?: number
 }) {
   return {
     label: {
@@ -157,6 +170,7 @@ export function rotuloValor({
       color: cor,
       fontSize: 11,
       fontWeight: 600 as const,
+      ...(distancia === undefined ? {} : { distance: distancia }),
     },
     labelLayout: { hideOverlap: true },
   }
