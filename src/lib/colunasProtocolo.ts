@@ -86,6 +86,15 @@ export const COLUNAS: DefColuna[] = [
   { chave: 'reincidenciaQtd', rotulo: 'Retornos', alinhar: 'dir', largura: 80 },
   { chave: 'voltouEm', rotulo: 'Voltou em', largura: 110 },
   { chave: 'protocoloAnterior', rotulo: 'Protocolo anterior', largura: 140 },
+  /*
+    O OFENSOR, NOMINAL. Vem do executor da agenda do protocolo ANTERIOR — é a
+    mesma pessoa que a página de Ofensores agrega, e é o que permite conferir
+    aquele número linha a linha: 23 lá, 23 linhas aqui com o filtro ligado.
+
+    Fica ao lado de `protocoloAnterior` de propósito: o par (qual protocolo,
+    quem o atendeu) só se lê junto.
+  */
+  { chave: 'tecnicoAnterior', rotulo: 'Técnico do anterior', largura: 220 },
   { chave: 'criador', rotulo: 'Criador', largura: 200 },
 ]
 
@@ -118,7 +127,7 @@ export const CONJUNTOS = {
       'instalador', 'tecnicosAgenda', 'auxiliar', 'responsavel',
       'agendamentos', 'mttrHoras', 'improdutivas', 'motivosImprod', 'preventiva',
       'reincidencia', 'reincidenciaQtd',
-      'voltouEm', 'protocoloAnterior',
+      'voltouEm', 'protocoloAnterior', 'tecnicoAnterior',
       'tipo', 'catalogo', 'cat2', 'solucao',
     ],
   },

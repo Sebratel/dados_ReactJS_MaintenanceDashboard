@@ -161,6 +161,30 @@ export const FiltrosSchema = z.object({
    * da mesma instalação este reparo entrou.
    */
   retorno: z.enum(['v30', 'v60', 'v90', 'sim', 'nao']).optional(),
+  /**
+   * O TÉCNICO DO ATENDIMENTO ANTERIOR — o "ofensor".
+   *
+   * ⚠️ NÃO CONFUNDIR COM `tecnico`, E A DISTINÇÃO É O MOTIVO DE ELE EXISTIR.
+   * `tecnico` recorta pelo reparo ATUAL: "dos reparos que o X atendeu, quantos
+   * eram retorno". `tecnicoOfensor` recorta pela ponta de trás: "quantos
+   * retornos o X causou" — que é a pergunta que a tela de Ofensores faz.
+   *
+   * Reportado pela Manutenção em 19/10/2026: o painel mostrava 23 para o
+   * Alisson e, ao filtrar `Técnico = Alisson`, o número caía para 7. Os dois
+   * estavam certos — 7 são os reparos DELE que voltaram e cujo anterior também
+   * era dele —, mas num painel cujo assunto inteiro é o atendimento anterior,
+   * o filtro incidir sobre o reparo atual surpreende, e quem não lê o
+   * comentário no código lê o número errado sem perceber.
+   *
+   * Vale em Ofensores e em Protocolos, e é o que fecha o drill-down: 23 lá,
+   * 23 linhas na aba Auditoria.
+   *
+   * Fica FORA da barra global (`CAMPOS_MULTI`) porque nas outras telas não há
+   * atendimento anterior para recortar — mesma razão de `reincidencia` e
+   * `retorno`. String simples e não lista: o controle é o clique numa barra, e
+   * nome de pessoa com `~` quebraria o separador de `listaTexto`.
+   */
+  tecnicoOfensor: z.string().min(1).optional(),
   /** dimensão de agrupamento, para o endpoint de ranking */
   dim: z
     .enum(Object.keys(DIMENSOES) as [Dimensao, ...Dimensao[]])
@@ -233,6 +257,7 @@ export function parsearFiltros(sp: URLSearchParams | Record<string, string | str
     categoria2: obj.categoria2,
     reincidencia: obj.reincidencia,
     retorno: obj.retorno,
+    tecnicoOfensor: obj.tecnicoOfensor,
     dim: obj.dim ?? base.dim,
     limite: obj.limite ?? base.limite,
   }

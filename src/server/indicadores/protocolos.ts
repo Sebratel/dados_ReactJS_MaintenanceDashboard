@@ -9,7 +9,7 @@ import {
   TIPOS_PREVENTIVOS,
 } from '@/config/regras-negocio'
 import type { Filtros } from '@/lib/filtros'
-import { CASAS_HORA, colunaEixo, montarFrom, montarWhere } from './base'
+import { CASAS_HORA, ORDEM_EXECUTOR, colunaEixo, montarFrom, montarWhere } from './base'
 
 /**
  * RELATÓRIO ANALÍTICO — um protocolo por linha.
@@ -128,6 +128,14 @@ export type LinhaProtocolo = {
   voltouEm: string | null
   /** o protocolo ANTERIOR da mesma instalação, para auditar o par */
   protocoloAnterior: string | null
+  /**
+   * Quem atendeu o protocolo ANTERIOR — o "ofensor" da página de Ofensores,
+   * aqui nominal. É o que fecha o drill-down: o técnico que aparece com 23
+   * retornos lá devolve 23 linhas aqui com `tecnicoOfensor` ligado.
+   *
+   * Vem do executor da agenda, nunca do responsável — ver a nota no CTE.
+   */
+  tecnicoAnterior: string | null
   /**
    * Três estados, e a distinção é o ponto: um NOME (houve dupla),
    * `SEM AUXILIAR` (o técnico declarou que foi sozinho) ou vazio (não registrou
@@ -276,17 +284,36 @@ export async function obterProtocolos(f: Filtros): Promise<ResultadoProtocolos> 
     : null
 
   /**
-   * OS DOIS CORTES VIRAM UMA LISTA SÓ, por interseção.
+   * O CORTE PELO OFENSOR — o que fecha o drill-down vindo de Ofensores.
+   *
+   * Reusa o mesmo mapa `retorno`, então por construção a lista daqui é a mesma
+   * que a página de Ofensores agrega: não há duas definições de "atendimento
+   * anterior" para divergirem.
+   */
+  const protocolosDoOfensor = f.tecnicoOfensor
+    ? [...retorno.entries()]
+        .filter(([, r]) => r.tecnicoAnterior === f.tecnicoOfensor)
+        .map(([protocolo]) => protocolo)
+    : null
+
+  /**
+   * OS CORTES VIRAM UMA LISTA SÓ, por interseção.
    *
    * Reincidência recorta preventiva; retorno recorta reparo. Pedir os dois ao
    * mesmo tempo devolve vazio — o que está certo, porque um protocolo não é
    * preventiva e reparo ao mesmo tempo. Resolver a interseção aqui em JS deixa
    * o SQL com um único filtro em vez de dois encadeados.
    */
+  const listas = [protocolosDoCorte, protocolosDoRetorno, protocolosDoOfensor].filter(
+    (x): x is number[] => x !== null
+  )
   const alvos =
-    protocolosDoCorte && protocolosDoRetorno
-      ? protocolosDoCorte.filter((x) => new Set(protocolosDoRetorno).has(x))
-      : (protocolosDoCorte ?? protocolosDoRetorno)
+    listas.length === 0
+      ? null
+      : listas.reduce((a, b) => {
+          const s = new Set(b)
+          return a.filter((x) => s.has(x))
+        })
 
   /**
    * A LISTA ENTRA COMO CTE MATERIALIZADO, e não como `ai.protocol = any(...)`.
@@ -543,6 +570,7 @@ export async function obterProtocolos(f: Filtros): Promise<ResultadoProtocolos> 
       reincidenciaQtd: r?.qtd ?? null,
       voltouEm: v?.faixa ?? null,
       protocoloAnterior: v?.anterior ?? null,
+      tecnicoAnterior: v?.tecnicoAnterior ?? null,
     }
   })
 
@@ -558,7 +586,7 @@ export async function obterProtocolos(f: Filtros): Promise<ResultadoProtocolos> 
   }
 }
 
-type Retorno = { faixa: string | null; anterior: string | null }
+type Retorno = { faixa: string | null; anterior: string | null; tecnicoAnterior: string | null }
 
 /**
  * "Este reparo é um RETORNO?" — quanto tempo depois do atendimento anterior da
@@ -604,6 +632,12 @@ async function retornoPorProtocolo(f: Filtros): Promise<Map<number, Retorno>> {
       SELECT ai.protocol,
              a.created,
              coalesce(ac."user", 'tag:' || ai.contract_service_tag_id::text) AS instalacao,
+             -- QUEM FOI AO CLIENTE, mesma regra da página de Ofensores: é este
+             -- nome que vira "técnico ofensor" na linha do retorno. Sair do
+             -- responsible_id aqui repetiria o defeito que a auditoria de
+             -- Produtividade achou em 16/10/2026 — backoffice levando crédito
+             -- de campo —, só que com o sinal trocado: levando CULPA.
+             coalesce(ex.executor, resp.name) AS tecnico,
              (coalesce(it.title, '')   = any(${tiposPrev})
            OR coalesce(cat2.title, '') = any(${catsPrev})) AS eh_preventiva
         FROM erp.assignment_incidents ai
@@ -622,6 +656,13 @@ async function retornoPorProtocolo(f: Filtros): Promise<Map<number, Retorno>> {
            ORDER BY x.active DESC NULLS LAST, x.id DESC
            LIMIT 1
         ) ac ON true
+        LEFT JOIN erp.people resp ON resp.id = a.responsible_id
+        LEFT JOIN LATERAL (
+          SELECT (array_agg(v.resource_name ORDER BY ${ORDEM_EXECUTOR})
+                    FILTER (WHERE v.routing_status >= 4))[1] AS executor
+            FROM erp.v_service_desk_slots_productivity_informative v
+           WHERE v.assignment_id = a.id
+        ) ex ON true
        WHERE a.created >= (${de}::date - interval '90 days')
          AND a.created <  (${ate}::date + interval '1 day')
          AND cs.title = any(${catalogos})
@@ -637,7 +678,8 @@ async function retornoPorProtocolo(f: Filtros): Promise<Map<number, Retorno>> {
     vizinhos AS (
       SELECT r.protocol, r.created,
              lag(r.created)  OVER w AS ant_created,
-             lag(r.protocol) OVER w AS ant_protocol
+             lag(r.protocol) OVER w AS ant_protocol,
+             lag(r.tecnico)  OVER w AS ant_tecnico
         FROM reparos r
       WINDOW w AS (PARTITION BY r.instalacao ORDER BY r.created, r.protocol)
     )
@@ -654,7 +696,14 @@ async function retornoPorProtocolo(f: Filtros): Promise<Map<number, Retorno>> {
            CASE
              WHEN ant_created >= created - interval '90 days'
              THEN ant_protocol::text
-           END AS anterior
+           END AS anterior,
+           -- pelo mesmo critério do protocolo anterior: só aparece quando ele
+           -- EXPLICA o retorno. Nome de pessoa pendurado num atendimento de 8
+           -- meses atrás seria acusação sem nexo.
+           CASE
+             WHEN ant_created >= created - interval '90 days'
+             THEN ant_tecnico
+           END AS tecnico_anterior
       FROM vizinhos
      WHERE created >= ${de}::date
        AND created <  (${ate}::date + interval '1 day')`
@@ -663,8 +712,14 @@ async function retornoPorProtocolo(f: Filtros): Promise<Map<number, Retorno>> {
     protocolo: string
     faixa: string | null
     anterior: string | null
+    tecnico_anterior: string | null
   }>(sql, params)
-  return new Map(rows.map((r) => [Number(r.protocolo), { faixa: r.faixa, anterior: r.anterior }]))
+  return new Map(
+    rows.map((r) => [
+      Number(r.protocolo),
+      { faixa: r.faixa, anterior: r.anterior, tecnicoAnterior: r.tecnico_anterior },
+    ])
+  )
 }
 
 type Reincidencia = { rotulo: string | null; qtd: number }

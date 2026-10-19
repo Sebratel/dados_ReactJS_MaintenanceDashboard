@@ -9,6 +9,7 @@ import {
   TIPOS_PREVENTIVOS,
 } from '@/config/regras-negocio'
 import type { Filtros } from '@/lib/filtros'
+import { ORDEM_EXECUTOR } from './base'
 
 /**
  * Ofensores (docs/01 §6).
@@ -140,6 +141,36 @@ export type ResultadoOfensores = {
  * que se comporta ao contrario dos vizinhos obriga a pessoa a lembrar de uma
  * excecao, e quem nao lembra le o numero errado sem perceber.
  */
+/**
+ * QUEM FOI AO CLIENTE — e não quem é o responsável do protocolo.
+ *
+ * ⚠️ ESTA PÁGINA APONTAVA A PESSOA ERRADA. O "ofensor" saía de `resp.name`,
+ * que é o `responsible_id` do protocolo — a mesma fonte que a auditoria de
+ * Produtividade provou errada em 16/10/2026, onde ela creditava produção de
+ * campo a oito nomes de backoffice que nunca saíram.
+ *
+ * Aqui o estrago é nominal e pessoal: a página diz "este técnico causou N
+ * retornos". Atribuir isso a quem não foi ao cliente é pior que um total
+ * errado — é o nome de alguém numa lista de ofensores.
+ *
+ * Medido em setembro/2026: dos 397 retornos, **8 (2,0%) trocam de ofensor**
+ * entre os dois critérios. Pouco no agregado, decisivo para os 8.
+ *
+ * `coalesce(ex.executor, resp.name)` e não só o executor: quando o protocolo
+ * não tem slot reservado não há a quem apontar, e o responsável é a melhor
+ * resposta disponível. Mesma regra de `matriz_base` em produtividade.ts.
+ */
+const LATERAL_EXECUTOR = /* sql */ `
+        LEFT JOIN LATERAL (
+          SELECT (array_agg(v.resource_name ORDER BY ${ORDEM_EXECUTOR})
+                    FILTER (WHERE v.routing_status >= 4))[1] AS executor
+            FROM erp.v_service_desk_slots_productivity_informative v
+           WHERE v.assignment_id = a.id
+        ) ex ON true`
+
+/** o técnico que a página nomeia, nas três consultas */
+const EXPR_TECNICO = `coalesce(ex.executor, resp.name)`
+
 function condicoesUsuario(f: Filtros, p: (v: unknown) => string): string[] {
   const c: string[] = []
   // `ag.regiao` exige o LATERAL da view de field service (ver `joinBase`)
@@ -150,7 +181,7 @@ function condicoesUsuario(f: Filtros, p: (v: unknown) => string): string[] {
   if (f.catalogo) c.push(`cs.title = any(${p(f.catalogo)}::text[])`)
   if (f.status) c.push(`st.title = any(${p(f.status)}::text[])`)
   if (f.categoria2) c.push(`cat2.title = any(${p(f.categoria2)}::text[])`)
-  if (f.tecnico) c.push(`resp.name = any(${p(f.tecnico)}::text[])`)
+  if (f.tecnico) c.push(`${EXPR_TECNICO} = any(${p(f.tecnico)}::text[])`)
   return c
 }
 
@@ -190,7 +221,7 @@ export async function obterOfensores(f: Filtros): Promise<ResultadoOfensores> {
       SELECT a.id,
              a.created,
              coalesce(ac.user, 'tag:' || ai.contract_service_tag_id::text) AS instalacao,
-             resp.name  AS tecnico,
+             ${EXPR_TECNICO}  AS tecnico,
              pe.name    AS cliente,
              ss.title   AS solucao,
              cat2.title AS categoria,
@@ -213,6 +244,7 @@ export async function obterOfensores(f: Filtros): Promise<ResultadoOfensores> {
         LEFT JOIN erp.catalog_services cs ON cs.id = ai.catalog_service_id
         LEFT JOIN erp.people pe           ON pe.id = a.requestor_id
         LEFT JOIN erp.people resp         ON resp.id = a.responsible_id
+        ${LATERAL_EXECUTOR}
         LEFT JOIN erp.solicitation_solutions ss ON ss.id = ai.solicitation_solution_id
         LEFT JOIN erp.solicitation_category_matrices scm ON scm.id = ai.solicitation_category_matrix_id
         LEFT JOIN erp.solicitation_service_categories cat2 ON cat2.id = scm.service_category_id_2
@@ -346,7 +378,7 @@ export async function obterOfensores(f: Filtros): Promise<ResultadoOfensores> {
   const filtroVol = condVol.length ? `AND ${condVol.join(' AND ')}` : ''
 
   const sqlVolume = /* sql */ `
-    SELECT resp.name AS tecnico,
+    SELECT ${EXPR_TECNICO} AS tecnico,
            count(*) FILTER (WHERE a.created >= ${vDe}::date)::int AS "noPeriodo",
            count(*)::int AS "naJanela"
       FROM erp.assignment_incidents ai
@@ -358,6 +390,7 @@ export async function obterOfensores(f: Filtros): Promise<ResultadoOfensores> {
       -- pe entra para o filtro de CIDADE; antes so resp era necessario
       LEFT JOIN erp.people pe           ON pe.id = a.requestor_id
       LEFT JOIN erp.people resp         ON resp.id = a.responsible_id
+      ${LATERAL_EXECUTOR}
       LEFT JOIN erp.solicitation_category_matrices scm ON scm.id = ai.solicitation_category_matrix_id
       LEFT JOIN erp.solicitation_service_categories cat2 ON cat2.id = scm.service_category_id_2
       ${f.base ? JOIN_BASE : ''}
@@ -405,7 +438,7 @@ export async function obterOfensores(f: Filtros): Promise<ResultadoOfensores> {
       SELECT a.id,
              a.created,
              coalesce(ac.user, 'tag:' || ai.contract_service_tag_id::text) AS instalacao,
-             resp.name AS tecnico,
+             ${EXPR_TECNICO} AS tecnico,
              (coalesce(it.title, '')   = any(${wTiposPrev})
            OR coalesce(cat2.title, '') = any(${wCatsPrev})) AS eh_preventiva,
              -- mesmo raciocínio da consulta principal: booleano aqui, recorte lá
@@ -420,6 +453,7 @@ export async function obterOfensores(f: Filtros): Promise<ResultadoOfensores> {
         LEFT JOIN erp.catalog_services cs ON cs.id = ai.catalog_service_id
         LEFT JOIN erp.people pe           ON pe.id = a.requestor_id
         LEFT JOIN erp.people resp         ON resp.id = a.responsible_id
+        ${LATERAL_EXECUTOR}
         LEFT JOIN erp.solicitation_category_matrices scm ON scm.id = ai.solicitation_category_matrix_id
         LEFT JOIN erp.solicitation_service_categories cat2 ON cat2.id = scm.service_category_id_2
         LEFT JOIN LATERAL (
@@ -494,6 +528,20 @@ export async function obterOfensores(f: Filtros): Promise<ResultadoOfensores> {
   }
   const totalAcum = novo()
 
+  /**
+   * ⚠️ O PAINEL DE TÉCNICO OFENSOR NÃO SE AUTO-FILTRA.
+   *
+   * `tecnicoOfensor` recorta os KPIs e os painéis de cliente, solução,
+   * categoria e catálogo — mas o ranking de técnicos continua inteiro. É a
+   * mesma regra do painel de classes em recorrencia.ts, e pela mesma razão: o
+   * gráfico é o controle do filtro. Auto-filtrado, sobraria UMA barra e não
+   * haveria como trocar de técnico nem limpar o recorte sem editar a URL.
+   *
+   * Em JS e não no SQL porque o técnico anterior é atributo das linhas que a
+   * consulta JÁ devolveu — dá para contar os dois conjuntos numa passagem só.
+   */
+  const ofensorAlvo = f.tecnicoOfensor ?? null
+
   for (const l of r.rows) {
     const n = l.retornos
     const somar = (a: Acum) => {
@@ -501,14 +549,16 @@ export async function obterOfensores(f: Filtros): Promise<ResultadoOfensores> {
       else if (l.janela === '60') a.r60 += n
       else a.r90 += n
     }
-    somar(totalAcum)
     const em = (m: Map<string, Acum>, k: string | null) => {
       const chave = k ?? '(sem informação)'
       const a = m.get(chave) ?? novo()
       somar(a)
       m.set(chave, a)
     }
+    // o ranking de técnicos vem antes do corte, de propósito
     em(mapas.tecnico, l.tecnico_anterior)
+    if (ofensorAlvo && l.tecnico_anterior !== ofensorAlvo) continue
+    somar(totalAcum)
     em(mapas.cliente, l.cliente)
     em(mapas.solucao, l.solucao_anterior)
     em(mapas.categoria, l.categoria_anterior)
@@ -557,7 +607,12 @@ export async function obterOfensores(f: Filtros): Promise<ResultadoOfensores> {
   const retornos = totalAcum.r30 + totalAcum.r60 + totalAcum.r90
   // denominador do CARTÃO: só o período, e aí sim numerador e denominador
   // falam do mesmo mês
-  const reparosPeriodo = rv.rows.reduce((s, x) => s + x.noPeriodo, 0)
+  // Com um ofensor selecionado o denominador tem de ser O DELE, senão a taxa
+  // dividiria os retornos de uma pessoa pelos atendimentos do time inteiro e
+  // sairia quase zero — o cartão leria "ótimo" justamente ao isolar quem erra.
+  const reparosPeriodo = rv.rows
+    .filter((x) => !ofensorAlvo || x.tecnico === ofensorAlvo)
+    .reduce((s, x) => s + x.noPeriodo, 0)
 
   return {
     data: {

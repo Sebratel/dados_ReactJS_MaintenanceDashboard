@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useCallback, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { parsearFiltros } from '@/lib/filtros'
 import { useOfensores } from '@/lib/useIndicador'
 import { Painel } from '@/components/Painel'
@@ -28,6 +29,39 @@ export function OfensoresConteudo() {
   const sp = useSearchParams()
   const filtros = useMemo(() => parsearFiltros(Object.fromEntries(sp.entries())), [sp])
   const [ordem, setOrdem] = useState<Ordem>('retornos')
+  const router = useRouter()
+  const pathname = usePathname()
+
+  /**
+   * O OFENSOR SELECIONADO — clicar na barra aplica, clicar de novo remove.
+   *
+   * ⚠️ NÃO É O FILTRO `Técnico` DA BARRA, e a diferença é o motivo deste
+   * controle existir. `Técnico` recorta o reparo ATUAL: "dos reparos que o X
+   * atendeu, quantos eram retorno". Este recorta a ponta de trás: "quantos
+   * retornos o X causou".
+   *
+   * Reportado em 19/10/2026: o painel mostrava 23 para o Alisson e o filtro da
+   * barra derrubava para 7. Os dois números estavam certos e respondiam
+   * perguntas diferentes — só que a tela não dizia qual era qual.
+   */
+  const ofensor = sp.get('tecnicoOfensor')
+
+  const alternarOfensor = useCallback(
+    (nome: string) => {
+      const q = new URLSearchParams(sp.toString())
+      if (q.get('tecnicoOfensor') === nome) q.delete('tecnicoOfensor')
+      else q.set('tecnicoOfensor', nome)
+      router.replace(`${pathname}?${q.toString()}`, { scroll: false })
+    },
+    [pathname, router, sp]
+  )
+
+  /** mesma query, na aba nominal — é o que fecha a conferência linha a linha */
+  const linkProtocolos = useMemo(() => {
+    const q = new URLSearchParams(sp.toString())
+    q.set('retorno', 'sim')
+    return `/protocolos?${q.toString()}`
+  }, [sp])
 
   const q = useOfensores(filtros)
   const d = q.data?.data
@@ -84,6 +118,40 @@ export function OfensoresConteudo() {
         está na página Preventivos.
       </p>
 
+      {/*
+        A TARJA DO RECORTE PRECISA SER VISÍVEL FORA DO PAINEL QUE A APLICOU.
+        Quem rola a tela e lê "16 de 86" nos cartões tem de saber que aquilo já
+        é o recorte de uma pessoa — senão lê a taxa do time. O link para a aba
+        nominal fica aqui porque é exatamente neste ponto que a pergunta
+        aparece: "quais protocolos são esses?".
+      */}
+      {ofensor && (
+        <div
+          className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-xs"
+          style={{ borderColor: 'var(--brand)', background: 'var(--surface-1)' }}
+          role="status"
+        >
+          <span className="text-[var(--text-secondary)]">Recortado pelo ofensor</span>
+          <strong className="text-[var(--text-primary)]">{ofensor}</strong>
+          <button
+            type="button"
+            onClick={() => alternarOfensor(ofensor)}
+            className="rounded border px-2 py-0.5 text-[11px] text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            limpar ✕
+          </button>
+          <Link
+            href={linkProtocolos}
+            title="Abre a lista nominal com o mesmo recorte — é onde se confere protocolo a protocolo"
+            className="ml-auto rounded border px-2 py-0.5 text-[11px] text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            ver os protocolos ↗
+          </Link>
+        </div>
+      )}
+
       <section
         className="grid gap-3"
         style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}
@@ -116,7 +184,11 @@ export function OfensoresConteudo() {
 
       <Painel
         titulo="Técnico do atendimento anterior"
-        descricao="Alterne entre volume e taxa — as duas listas são diferentes e as duas importam"
+        descricao={
+          ofensor
+            ? `Recortado por ${ofensor} — os cartões e os painéis abaixo falam só dos retornos que ele causou. Clique nele de novo para limpar.`
+            : 'Clique numa barra para recortar a tela por aquele ofensor. Alterne entre volume e taxa — as duas listas são diferentes e as duas importam'
+        }
         carregando={q.isLoading}
         erro={erro}
         nota={
@@ -179,6 +251,8 @@ export function OfensoresConteudo() {
               detalhe: `${fmtInt(x.retornos)} retornos em ${fmtInt(x.atendimentos)} atendimentos · taxa ${fmtFracaoPct(x.taxaRetorno, 1)} · ≤30d ${fmtInt(x.ret30)}`,
             }))}
             unidade={ordem === 'taxa' ? '‰ de retorno' : 'retornos'}
+            aoClicar={alternarOfensor}
+            selecionado={ofensor}
           />
         )}
       </Painel>
