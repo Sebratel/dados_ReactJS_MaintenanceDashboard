@@ -29,8 +29,8 @@ export function OperacaoConteudo() {
   return (
     <div className="mx-auto flex max-w-[1600px] flex-col gap-4">
       <Painel
-        titulo="Entrantes × encerrados"
-        descricao={`Eixo da data: ${filtros.eixo}`}
+        titulo="Entrantes e saldo do backlog"
+        descricao={`Barra = entrantes. Linha = saldo (entra − sai): acima da tracejada o backlog cresceu. Encerrados fica no tooltip e na aba Tabela. Eixo da data: ${filtros.eixo}`}
         carregando={serie.isLoading}
         erro={serie.error ? String(serie.error.message) : null}
         tabela={{

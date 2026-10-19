@@ -122,7 +122,21 @@ export function SerieTemporal({
           hideOverlap: true,
         },
       }),
-      yAxis: baseEixoValor(tk, { minInterval: 1 }),
+      yAxis: [
+        baseEixoValor(tk, { minInterval: 1 }),
+        /*
+         * EIXO DA DIREITA SÓ PARA O SALDO, e ele precisa conter o zero.
+         * A leitura inteira do painel é "a linha está acima ou abaixo de
+         * zero?" — um eixo que começasse no mínimo da série esconderia
+         * justamente isso, desenhando um saldo sempre positivo como se
+         * oscilasse em torno de nada.
+         */
+        baseEixoValor(tk, {
+          minInterval: 1,
+          splitLine: { show: false },
+          axisLabel: { color: tk.textMuted, fontSize: 11, formatter: (v: number) => (v > 0 ? `+${fmtInt(v)}` : fmtInt(v)) },
+        }),
+      ],
       dataZoom: comZoom
         ? [
             { type: 'inside', throttle: 60 },
@@ -142,11 +156,36 @@ export function SerieTemporal({
             },
           ]
         : undefined,
+      /*
+       * ⚠️ DUAS LINHAS QUASE IGUAIS NÃO DIZEM NADA, E ESSE ERA O DEFEITO.
+       *
+       * Criados e encerrados andam colados por construção — num mês normal
+       * entra quase o mesmo tanto que sai. No grão mensal as duas linhas se
+       * sobrepunham e o painel ocupava a largura inteira para comunicar
+       * "equilíbrio", que é o estado esperado e portanto não é notícia.
+       *
+       * Reportado pela Manutenção em 19/10/2026. A pergunta que a operação faz
+       * ali não é "quanto entrou e quanto saiu", é **"está acumulando?"** — e
+       * isso é o SALDO, que estava escondido no tooltip.
+       *
+       * Agora: barra = criados (o volume, que é o contexto), linha = saldo (a
+       * resposta). Encerrados continua no tooltip e na aba Tabela — sai do
+       * desenho, não do painel.
+       */
       series: [
         {
           name: 'Criados',
-          type: 'line',
+          type: 'bar',
+          yAxisIndex: 0,
           data: dados.map((d) => d.abertos),
+          itemStyle: { color: tk.series[0], borderRadius: MARCA.barraTopo4px },
+          emphasis: { focus: 'series' as const },
+        },
+        {
+          name: 'Saldo (entra − sai)',
+          type: 'line',
+          yAxisIndex: 1,
+          data: dados.map((d) => d.saldo),
           // explícito porque é carga: período futuro vem null (item D) e a linha
           // precisa PARAR ali, não saltar por cima do vazio até o fim do mês.
           connectNulls: false,
@@ -154,28 +193,43 @@ export function SerieTemporal({
           symbol: 'circle',
           symbolSize: MARCA.tamanhoMarcador,
           showSymbol: dados.length <= 40,
-          lineStyle: { width: MARCA.larguraLinha, color: tk.series[0] },
-          itemStyle: { color: tk.series[0], borderColor: tk.surface, borderWidth: 2 },
-          label: rotuloFinal(tk.series[0]!),
-          emphasis: { focus: 'series' as const },
-        },
-        {
-          name: 'Encerrados',
-          type: 'line',
-          data: dados.map((d) => d.encerrados),
-          connectNulls: false,
-          smooth: false,
-          symbol: 'circle',
-          symbolSize: MARCA.tamanhoMarcador,
-          showSymbol: dados.length <= 40,
           lineStyle: { width: MARCA.larguraLinha, color: tk.series[2] },
-          itemStyle: { color: tk.series[2], borderColor: tk.surface, borderWidth: 2 },
+          /*
+           * A COR DO PONTO CARREGA O SINAL, não a cor da linha.
+           * Pintar a linha inteira de vermelho gritaria o mês inteiro num
+           * indicador que passa a vida perto de zero; pintá-la de neutro
+           * perderia o aviso. O ponto resolve os dois: vermelho onde o backlog
+           * cresceu, verde onde encolheu.
+           */
+          itemStyle: {
+            color: (p: { data: number | null }) =>
+              p.data === null || p.data === 0
+                ? tk.textMuted
+                : p.data > 0
+                  ? tk.statusCritical
+                  : tk.statusGood,
+            borderColor: tk.surface,
+            borderWidth: 2,
+          },
           label: rotuloFinal(tk.series[2]!),
+          markLine: {
+            silent: true,
+            symbol: 'none',
+            data: [{ yAxis: 0 }],
+            lineStyle: { color: tk.axis, type: 'dashed', width: 1 },
+            label: {
+              show: true,
+              position: 'insideEndTop',
+              formatter: 'equilíbrio',
+              color: tk.textMuted,
+              fontSize: 10,
+            },
+          },
           emphasis: { focus: 'series' as const },
         },
       ],
     }
   }, [dados, granularidade, comZoom])
 
-  return <Chart option={option} altura={altura} aria-label="Protocolos abertos e encerrados ao longo do tempo" />
+  return <Chart option={option} altura={altura} aria-label="Protocolos criados por período, com o saldo entre entrada e saída" />
 }
