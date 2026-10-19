@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { GRANULARIDADES, idadeMaximaDias, parsearFiltros } from '@/lib/filtros'
 import { useCoeficiente, usePreventivos } from '@/lib/useIndicador'
 import { Painel } from '@/components/Painel'
+import { LinkHistorico } from '@/components/LinkHistorico'
 import { StatTile } from '@/components/kpi/StatTile'
 import { RankingSimples } from '@/components/charts/RankingSimples'
 import { ColunasPeriodo } from '@/components/charts/ColunasPeriodo'
@@ -228,6 +229,7 @@ export function PreventivosConteudo() {
         <Painel
           titulo={`Preventivas abertas por ${GRANULARIDADES[filtros.granularidade].label.toLowerCase()}`}
           descricao="Volume de protocolos preventivos criados — o tooltip traz a reincidência do período"
+          acoes={<LinkHistorico metrica="preventivas" rotulo="% sobre a base" />}
           carregando={q.isLoading}
           erro={erro}
           tabela={{

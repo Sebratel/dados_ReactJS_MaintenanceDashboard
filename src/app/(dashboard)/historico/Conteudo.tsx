@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useCallback, useMemo } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { parsearFiltros } from '@/lib/filtros'
 import { useHistorico } from '@/lib/useIndicador'
 import { Painel } from '@/components/Painel'
@@ -43,7 +43,34 @@ const METRICAS: { id: MetricaHistorico; label: string; unidade: string; ajuda: s
 export function HistoricoConteudo() {
   const sp = useSearchParams()
   const filtros = useMemo(() => parsearFiltros(Object.fromEntries(sp.entries())), [sp])
-  const [metrica, setMetrica] = useState<MetricaHistorico>('entrantes')
+  const router = useRouter()
+  const pathname = usePathname()
+
+  /**
+   * A MÉTRICA MORA NA URL, não em estado local.
+   *
+   * Sem isso, o link "ver no Histórico" que as outras telas oferecem chegaria
+   * aqui sempre em Entrantes, e quem veio de Preventivos teria de trocar na
+   * mão — o link entregaria a tela, não a resposta. Na URL ele também
+   * sobrevive a copiar e colar para um colega, que é como esta Manutenção
+   * compartilha recorte desde o primeiro dia.
+   *
+   * Fica FORA do schema de `Filtros` de propósito, como `classeRec` não ficou:
+   * aqui não é recorte de dado, é qual série está em foco. `parsearFiltros`
+   * ignora a chave, e ela sobrevive porque os links são montados a partir da
+   * query inteira.
+   */
+  const metrica: MetricaHistorico =
+    (METRICAS.find((m) => m.id === sp.get('metrica'))?.id ?? 'entrantes')
+
+  const setMetrica = useCallback(
+    (id: MetricaHistorico) => {
+      const q = new URLSearchParams(sp.toString())
+      q.set('metrica', id)
+      router.replace(`${pathname}?${q.toString()}`, { scroll: false })
+    },
+    [pathname, router, sp]
+  )
 
   const q = useHistorico(filtros)
   const d = q.data?.data

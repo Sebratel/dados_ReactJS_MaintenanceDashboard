@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { CLASSE_REC_POR_CODIGO, parsearFiltros, type CodigoClasseRec } from '@/lib/filtros'
 import { useRecorrencia } from '@/lib/useIndicador'
 import { Painel } from '@/components/Painel'
+import { LinkHistorico } from '@/components/LinkHistorico'
 import { StatTile } from '@/components/kpi/StatTile'
 import { RankingSimples } from '@/components/charts/RankingSimples'
 import { fmtFracaoPct, fmtInt } from '@/lib/formato'
@@ -386,6 +387,7 @@ export function RecorrenciaConteudo() {
         <Painel
           titulo="Evolução mensal"
           descricao="Só aparece quando o recorte cobre mais de um mês"
+          acoes={<LinkHistorico metrica="clientes" rotulo="% sobre a base" />}
           carregando={q.isLoading}
           erro={erro}
           tabela={{

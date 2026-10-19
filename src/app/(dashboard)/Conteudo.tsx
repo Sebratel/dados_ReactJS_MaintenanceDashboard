@@ -12,6 +12,7 @@ import {
   useSerie,
 } from '@/lib/useIndicador'
 import { Painel } from '@/components/Painel'
+import { LinkHistorico } from '@/components/LinkHistorico'
 import { StatTile } from '@/components/kpi/StatTile'
 import { SerieTemporal } from '@/components/charts/SerieTemporal'
 import { SerieMttr } from '@/components/charts/SerieMttr'
@@ -255,6 +256,7 @@ export function VisaoExecutivaConteudo() {
       <Painel
         titulo="Coeficiente de reparos sobre a base de clientes"
         descricao="Reparos do dia ÷ clientes autenticados no dia, comparado à meta"
+        acoes={<LinkHistorico metrica="entrantes" rotulo="ver por mês" />}
         carregando={coef.isLoading}
         erro={coef.error ? String(coef.error.message) : null}
         nota={
