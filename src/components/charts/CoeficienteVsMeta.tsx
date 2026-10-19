@@ -11,6 +11,7 @@ import {
   baseTooltip,
   rotuloValor,
 } from '@/lib/tema'
+import { useTemaAtual } from '@/lib/useTema'
 import { fmtFracaoPct, fmtInt, fmtDiaCurto, fmtData } from '@/lib/formato'
 import type { PontoCoeficiente } from '@/server/indicadores/coeficiente'
 
@@ -31,6 +32,9 @@ export function CoeficienteVsMeta({
   dados: PontoCoeficiente[]
   altura?: number
 }) {
+  // o memo abaixo lê as variáveis CSS do tema — ver useTema.ts
+  const tema = useTemaAtual()
+
   const option = useMemo(() => {
     const tk = lerTokens()
 
@@ -136,7 +140,7 @@ export function CoeficienteVsMeta({
         data: ['Coeficiente', 'Meta'],
       },
     }
-  }, [dados])
+  }, [dados, tema])
 
   return <Chart option={option} altura={altura} aria-label="Coeficiente de reparos sobre a base de clientes, comparado à meta diária" />
 }

@@ -11,6 +11,7 @@ import {
   baseTooltip,
   rotuloValor,
 } from '@/lib/tema'
+import { useTemaAtual } from '@/lib/useTema'
 import { fmtDiaCurto, fmtFracaoPct, fmtInt } from '@/lib/formato'
 import type { PontoProdutividadeDia } from '@/server/indicadores/produtividade'
 
@@ -35,6 +36,9 @@ export function ComposicaoDiaria({
   dados: PontoProdutividadeDia[]
   altura?: number
 }) {
+  // o memo abaixo lê as variáveis CSS do tema — ver useTema.ts
+  const tema = useTemaAtual()
+
   const option = useMemo(() => {
     const tk = lerTokens()
 
@@ -120,7 +124,7 @@ export function ComposicaoDiaria({
         serie('Sem ação', tk.statusWarning, (d) => d.semAcao, true),
       ],
     }
-  }, [dados])
+  }, [dados, tema])
 
   return (
     <Chart

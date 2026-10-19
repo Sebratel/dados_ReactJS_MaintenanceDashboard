@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { Chart } from './Chart'
 import { lerTokens } from '@/lib/tema'
+import { useTemaAtual } from '@/lib/useTema'
 import { montarOpcaoHeatmap } from '@/lib/heatmapOpcao'
 import type { CelulaHeatmap } from '@/server/indicadores/heatmap'
 
@@ -26,9 +27,12 @@ export function HeatmapDiaTurno({
   metrica?: 'protocolos' | 'mttr'
   altura?: number
 }) {
+  // o memo abaixo lê as variáveis CSS do tema — ver useTema.ts
+  const tema = useTemaAtual()
+
   const option = useMemo(
     () => montarOpcaoHeatmap({ dados, metrica, tk: lerTokens() }),
-    [dados, metrica]
+    [dados, metrica, tema]
   )
 
   return (

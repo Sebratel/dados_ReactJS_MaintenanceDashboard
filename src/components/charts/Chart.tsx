@@ -77,7 +77,23 @@ export function Chart({ option, altura = 280, className, aoClicar, ...rest }: Ch
     const ro = new ResizeObserver(() => chart.resize())
     ro.observe(ref.current)
 
-    // o tema muda quando o usuário alterna light/dark → recria a option
+    /*
+     * ⚠️ ISTO NÃO RECOLORE NADA — só redimensiona.
+     *
+     * O comentário antigo aqui dizia "recria a option", e o corpo chamava
+     * `resize()`. A promessa estava no comentário e não no código: trocar de
+     * tema deixava todo gráfico pintado com as cores do tema anterior até um
+     * refetch reconstruí-lo por outro motivo. Reportado em 19/10/2026 —
+     * gradeado preto sobre fundo branco num lado, linha invisível no outro.
+     *
+     * Quem recolore é `useTemaAtual()` (lib/useTema.ts), chamado por cada
+     * gráfico e declarado nas dependências do memo que monta a `option`. A
+     * dependência fica EXPLÍCITA onde ela existe, em vez de virar efeito
+     * colateral invisível aqui dentro.
+     *
+     * O observer continua porque a troca de tema pode mexer em fonte e
+     * espaçamento, e aí o canvas precisa remedir.
+     */
     const mo = new MutationObserver(() => chart.resize())
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
 

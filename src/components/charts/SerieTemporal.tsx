@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { Chart } from './Chart'
 import { lerTokens, MARCA, baseEixoCategoria, baseEixoValor, baseGrid, baseTooltip } from '@/lib/tema'
+import { useTemaAtual } from '@/lib/useTema'
 import { fmtInt, fmtPeriodo } from '@/lib/formato'
 import type { PontoSerie } from '@/server/indicadores/serie'
 import type { Granularidade } from '@/lib/filtros'
@@ -28,6 +29,9 @@ export function SerieTemporal({
   altura?: number
   comZoom?: boolean
 }) {
+  // o memo abaixo lê as variáveis CSS do tema — ver useTema.ts
+  const tema = useTemaAtual()
+
   const option = useMemo(() => {
     const tk = lerTokens()
     const rotulos = dados.map((d) => fmtPeriodo(d.periodo, granularidade))
@@ -45,17 +49,31 @@ export function SerieTemporal({
       -1
     )
 
-    const rotuloFinal = (cor: string) => ({
-      show: true,
-      position: 'top' as const,
-      formatter: (p: { dataIndex: number; value: number }) =>
-        p.dataIndex === ultimo ? fmtInt(p.value) : '',
-      color: tk.textSecondary,
-      fontSize: 11,
-      fontWeight: 600 as const,
-      backgroundColor: tk.surface,
-      padding: [2, 3],
-      borderRadius: 3,
+    /**
+     * ⚠️ O RÓTULO FINAL É CONFIGURADO NO PONTO, NÃO NA SÉRIE.
+     *
+     * A versão anterior punha `label` na série com um `formatter` que devolvia
+     * '' para todos menos o último. Só que o ECharts desenha o FUNDO do rótulo
+     * mesmo com texto vazio: o resultado eram caixinhas da cor da superfície
+     * flutuando sobre cada ponto da linha, que no tema claro liam como sujeira
+     * no gráfico e no escuro como marcadores pretos sem significado.
+     *
+     * Reportado pela Manutenção em 19/10/2026 junto com o defeito de tema.
+     * Marcar só o item certo faz o ECharts não desenhar nada nos outros.
+     */
+    const pontoComRotulo = (valor: number | null) => ({
+      value: valor,
+      label: {
+        show: true,
+        position: 'top' as const,
+        formatter: () => (valor === null ? '' : `${valor > 0 ? '+' : ''}${fmtInt(valor)}`),
+        color: tk.textSecondary,
+        fontSize: 11,
+        fontWeight: 600 as const,
+        backgroundColor: tk.surface,
+        padding: [2, 3],
+        borderRadius: 3,
+      },
     })
 
     return {
@@ -185,7 +203,7 @@ export function SerieTemporal({
           name: 'Saldo (entra − sai)',
           type: 'line',
           yAxisIndex: 1,
-          data: dados.map((d) => d.saldo),
+          data: dados.map((d, i) => (i === ultimo ? pontoComRotulo(d.saldo) : d.saldo)),
           // explícito porque é carga: período futuro vem null (item D) e a linha
           // precisa PARAR ali, não saltar por cima do vazio até o fim do mês.
           connectNulls: false,
@@ -211,12 +229,14 @@ export function SerieTemporal({
             borderColor: tk.surface,
             borderWidth: 2,
           },
-          label: rotuloFinal(tk.series[2]!),
           markLine: {
             silent: true,
             symbol: 'none',
             data: [{ yAxis: 0 }],
-            lineStyle: { color: tk.axis, type: 'dashed', width: 1 },
+            // `tk.textMuted` e não `tk.axis`: o eixo é desenhado para sumir atrás
+            // do dado, e esta linha é a referência que decide a leitura do
+            // painel inteiro — precisa ser vista nos dois temas.
+            lineStyle: { color: tk.textMuted, type: 'dashed', width: 1 },
             label: {
               show: true,
               position: 'insideEndTop',
@@ -229,7 +249,7 @@ export function SerieTemporal({
         },
       ],
     }
-  }, [dados, granularidade, comZoom])
+  }, [dados, granularidade, comZoom, tema])
 
   return <Chart option={option} altura={altura} aria-label="Protocolos criados por período, com o saldo entre entrada e saída" />
 }
