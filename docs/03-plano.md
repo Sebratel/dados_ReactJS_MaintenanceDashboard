@@ -69,10 +69,36 @@ classificando esses 122 protocolos como "Abertos" quando provavelmente deveriam
 ser "Encerrados". Confirmo o comportamento atual (bug replicado) ou corrijo?
 **Default: corrijo** e deixo registrado.
 
-### 🟡 P5 — Janela de dados
-O modelo atual é fixo em `created >= '2026-01-01'`. Proponho parametrizar
-(`DATA_INICIO_HISTORICO`, default `2025-01-01`) para permitir comparação
-ano-contra-ano. Confirma?
+### 🟡 P5 — Janela de dados — **É DECISÃO DO TIER 2, não do Tier 1**
+
+O modelo atual é fixo em `created >= '2026-01-01'`. A constante
+`DATA_INICIO_HISTORICO` existe em `src/config/regras-negocio.ts` e **não é lida
+em lugar nenhum** — está esperando esta decisão.
+
+⚠️ **NO TIER 1 A PERGUNTA NÃO SE APLICA, e saber por quê evita refazer a
+discussão.** O dashboard não armazena dado: `erp.ts` e `maria.ts` são pools de
+conexão, toda tela consulta o Voalle e o Data Hub ao vivo, e a imagem Docker
+leva o build do Next e nada mais. O histórico no ERP não muda a imagem em um
+byte. A pergunta original da Manutenção (10/09/2026) era sobre peso de deploy, e
+o que pesava de fato eram `node_modules` e `.next` no build context — resolvido
+com `.dockerignore` e `output: 'standalone'` (678 MB → ~1 MB). Ver item V de
+docs/06.
+
+**Ela volta a valer aqui**, no banco `dash`, porque aí haverá dado armazenado de
+verdade. O princípio decidido com a Manutenção em 10/09/2026:
+
+> **Corta fato, nunca dimensão. E guarda histórico como agregado, não como
+> linha.**
+
+| Grão | Exemplos | Retenção | Por quê |
+|---|---|---|---|
+| **Dimensão** | cliente, contrato, equipe, técnico, cidade, catálogo | **completa** | contrato de 2020 continua ativo; cortar quebra o join e orfana o protocolo. São milhares de linhas, não milhões |
+| **Fato detalhado** | relato, visita, protocolo×dia, agenda | **6 meses** | é onde está o volume, e só serve recente |
+| **Agregado mensal** | KPI/mês, MTTR/mês, produtividade técnico×mês | **para sempre** | é como se guarda histórico sem guardar volume |
+
+A ressalva veio da própria Manutenção — *"contrato de cliente criado em 2020
+continua valendo e não pode ser cortado junto"* — e virou a primeira linha da
+tabela.
 
 ### 🟡 P6b — Renomear as variáveis de auth do `.env`
 O `.env` tem `VITE_GOOGLE_CLIENT_ID` (prefixo do **Vite**, herdado de um projeto
