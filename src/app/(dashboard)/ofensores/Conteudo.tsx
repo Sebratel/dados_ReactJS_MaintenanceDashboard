@@ -245,12 +245,23 @@ export function OfensoresConteudo() {
       >
         {d && (
           <RankingSimples
+            /*
+              NO MODO TAXA VAI A FRAÇÃO, NÃO `taxa × 1000`.
+              O truque de multiplicar por mil existia para ter inteiro na
+              barra, e cobrava o preço na leitura: o rótulo mostrava "39" ao
+              lado de quem tem 3,9% de retorno. Quem lê o gráfico lê a barra,
+              não o tooltip. Com `formatarValor` o comprimento continua certo e
+              o rótulo diz a unidade.
+            */
             dados={tecnicos.map((x) => ({
               rotulo: x.rotulo,
-              valor: ordem === 'taxa' ? Math.round((x.taxaRetorno ?? 0) * 1000) : x.retornos,
+              valor: ordem === 'taxa' ? (x.taxaRetorno ?? 0) : x.retornos,
               detalhe: `${fmtInt(x.retornos)} retornos em ${fmtInt(x.atendimentos)} atendimentos · taxa ${fmtFracaoPct(x.taxaRetorno, 1)} · ≤30d ${fmtInt(x.ret30)}`,
             }))}
-            unidade={ordem === 'taxa' ? '‰ de retorno' : 'retornos'}
+            unidade={ordem === 'taxa' ? 'de retorno' : 'retornos'}
+            formatarValor={
+              ordem === 'taxa' ? (v) => fmtFracaoPct(v, 1) : undefined
+            }
             aoClicar={alternarOfensor}
             selecionado={ofensor}
           />

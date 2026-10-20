@@ -9,7 +9,8 @@ import {
   baseEixoValor,
   baseGrid,
   baseTooltip,
-} from '@/lib/tema'
+} from '@/lib/tema'
+
 import { useTemaAtual } from '@/lib/useTema'
 import { fmtFracaoPct, fmtInt } from '@/lib/formato'
 
@@ -52,11 +53,28 @@ export function RankingSimples({
   escala = 'nominal',
   aoClicar,
   selecionado = null,
+  formatarValor = fmtInt,
 }: {
   dados: ItemSimples[]
   altura?: number
   unidade?: string
   escala?: 'nominal' | 'ordinal'
+  /**
+   * Como escrever o valor no rótulo da barra, no eixo e no tooltip.
+   *
+   * ⚠️ EXISTE PORQUE NÚMERO SEM UNIDADE MENTE. A tela de Ofensores, ordenada
+   * por taxa, plotava `taxa × 1000` para ter inteiro na barra — e o rótulo
+   * mostrava "39" ao lado de um técnico cuja taxa é 3,9%. O tooltip dizia
+   * "39 ‰ de retorno", mas quem lê o gráfico lê a barra, não o tooltip.
+   *
+   * Reportado pela Manutenção em 20/10/2026: "onde for % está aparecendo
+   * somente o número e confunde".
+   *
+   * Com o formatador, a tela passa o valor REAL (a fração) e manda formatá-lo
+   * como percentual — o comprimento da barra continua certo e o rótulo deixa
+   * de precisar de tradução.
+   */
+  formatarValor?: (v: number) => string
   /** clique na barra; recebe o rótulo. Sem isto o gráfico não é interativo. */
   aoClicar?: (rotulo: string) => void
   /** rótulo em foco — os demais esmaecem, em vez de sumirem */
@@ -98,12 +116,16 @@ export function RankingSimples({
           const d = ordenado[p.dataIndex]
           if (!d) return ''
           return `<b>${d.rotulo}</b><br/>
-            ${fmtInt(d.valor)} ${unidade}${
+            ${formatarValor(d.valor)} ${unidade}${
               d.share !== undefined ? ` (${fmtFracaoPct(d.share, 1)} do total)` : ''
             }${d.detalhe ? `<br/><span style="color:${tk.textMuted}">${d.detalhe}</span>` : ''}`
         },
       }),
-      xAxis: baseEixoValor(tk, { splitLine: { show: false } }),
+      xAxis: baseEixoValor(tk, {
+        splitLine: { show: false },
+        // o eixo fala a mesma língua do rótulo: com fração, 0,02 em vez de 0.02
+        axisLabel: { color: tk.textMuted, fontSize: 11, formatter: (v: number) => formatarValor(v) },
+      }),
       yAxis: baseEixoCategoria(tk, {
         data: ordenado.map((d) => d.rotulo),
         axisLine: { show: false },
@@ -148,7 +170,7 @@ export function RankingSimples({
           label: {
             show: true,
             position: 'right' as const,
-            formatter: (p: { value: number }) => fmtInt(p.value),
+            formatter: (p: { value: number }) => formatarValor(p.value),
             color: tk.textSecondary,
             fontSize: 11,
             fontWeight: 600 as const,
@@ -156,7 +178,7 @@ export function RankingSimples({
         },
       ],
     }
-  }, [dados, ordenado, unidade, escala, selecionado, tema])
+  }, [dados, ordenado, unidade, escala, selecionado, formatarValor, tema])
 
   const h = altura ?? Math.max(140, dados.length * 26 + 24)
   return (
