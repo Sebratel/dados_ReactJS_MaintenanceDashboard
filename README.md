@@ -130,6 +130,7 @@ src/
 
 | Rota | Página do Power BI equivalente | Estado |
 |---|---|---|
+| `/capa` | — (casca padrão Sebratel) | ✅ de todos: o que é o painel, fontes e definições |
 | `/` | Relatório Executivo | ✅ |
 | `/operacao` | Manutenção Campo + Protocolos Abertos Suporte | ✅ |
 | `/tempos` | Geral MTTs | ✅ |
@@ -216,23 +217,27 @@ contas — **quem controla acesso é `ALLOWED_DOMAIN` no servidor**.
 payload adulterado depois de assinado, token de outro projeto e domínio que
 apenas *termina* parecido com o autorizado.
 
-### A tela de login
+### A casca: login, cabeçalho, Capa e Configurações
 
-Segue o **mesmo padrão do COM · Gestão Comercial** (`comercial_pbi`): cena de
-marca à esquerda, card claro à direita com etiqueta do sistema, aviso de domínio
-e barra de rodapé. A porta de entrada dos sistemas internos é reconhecível entre
-si de propósito.
+Desde 22/10/2026 a moldura é a **casca padrão dos dashboards Sebratel** (skill
+`padrao-frontend-dashboards`), a mesma do COM · Gestão Comercial: tela de login,
+topo com `MAN · MANUTENÇÃO FTTX` e o título da tela, navegação em maiúsculas com
+a **Capa** primeiro e Configurações à direita, e o favicon com o logo circular.
+Os estilos são `src/app/casca.css`, **cópia fiel** do arquivo da skill — não
+editar lá; o que é só deste painel fica em `src/app/padrao.css`.
 
-O que muda em relação à de lá: a cor (vermelho da marca, não o vinho do
-relatório comercial — paleta se herda do relatório de origem, e as origens são
-diferentes) e o **motor**, que aqui é Firebase e lá é GSI. Copiar a tela não é
-copiar o mecanismo.
+O login copia a aparência, **não o motor**: lá é GSI, aqui é Firebase. Copiar a
+tela não é copiar o mecanismo.
 
-⚠️ Esta é a única tela que **não acompanha o alternador de tema**. Ela é uma cena
-de marca, fixa, e vem antes do cabeçalho — que é onde o alternador mora. Por isso
-as cores dela são literais, num módulo CSS próprio (`login.module.css`), e não
-tokens: token aqui viraria uma cena que se desmonta sozinha no tema escuro. As 8
-telas de dados seguem o tema normalmente.
+O ponto e o "há X" do topo são a idade do **dado** mais velho da tela
+(`meta.geradoEm` de cada indicador), não a hora em que o navegador buscou — o
+servidor pode servir um valor guardado por até 20× a validade dele enquanto
+recalcula. Dourado = mais de 30 min; vermelho = algum painel com erro.
+
+A **Capa** (`/capa`) é de todo mundo que entrou e não consulta o ERP: o frescor
+sai das consultas que as telas já fazem, e a base de clientes é uma soma de um
+dia no Data Hub, guardada por 1 h (`src/server/status.ts`). `/` continua sendo o
+Executivo, para não quebrar link nem favorito.
 
 ### Controle de acesso — quem vê o quê
 
@@ -244,7 +249,7 @@ que **não fala com Postgres**.
 |---|---|
 | `src/middleware.ts` (Edge) | autenticação: a sessão é válida? |
 | `src/server/auth/acesso.ts` (Node) | autorização: esta pessoa vê esta tela? |
-| `src/app/(dashboard)/layout.tsx` | aplica a decisão nas 8 telas, num ponto só |
+| `src/components/PaginaProtegida.tsx` | aplica a decisão em cada `page.tsx` — roda a cada navegação; `telas.test.ts` quebra se uma página nascer sem ele |
 | `src/server/auth/guarda.ts` | aplica nas rotas de API |
 
 O middleware passa o caminho pedido em `x-caminho` e o e-mail verificado em

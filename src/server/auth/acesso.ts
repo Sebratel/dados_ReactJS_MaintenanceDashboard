@@ -160,6 +160,24 @@ export function resolverAcesso(email: string): Acesso {
   return { email: normalizado, papel, telas, origemAdmin: null, controleAtivo: true }
 }
 
+/**
+ * O que uma página do grupo `(dashboard)` exige para abrir.
+ *
+ * `capa` é de todos: não mostra dado restrito, só o que o painel é e de onde
+ * vêm os números. `configuracoes` é decidida pelo papel, não pela matriz.
+ */
+export type AlvoPagina = IdTela | 'configuracoes' | 'capa'
+
+/**
+ * A regra de abrir uma página, sem nada de Next — para poder ser testada.
+ * Quem a aplica é `server/auth/pagina.tsx`, dentro de cada `page.tsx`.
+ */
+export function podeAbrir(acesso: Acesso, alvo: AlvoPagina): boolean {
+  if (alvo === 'capa') return true
+  if (alvo === 'configuracoes') return acesso.papel === 'admin'
+  return acesso.telas.has(alvo)
+}
+
 /* ──────────────────────────────────────────────────────────────────────
    Leitura e escrita da configuração — usadas pela tela de Configurações.
    ────────────────────────────────────────────────────────────────────── */

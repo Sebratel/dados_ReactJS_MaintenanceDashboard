@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { PaginaProtegida } from '@/components/PaginaProtegida'
 import { TemposConteudo } from './Conteudo'
 
 /**
@@ -10,8 +11,10 @@ import { TemposConteudo } from './Conteudo'
  */
 export default function Pagina() {
   return (
-    <Suspense fallback={<div className="h-96" aria-busy="true" />}>
-      <TemposConteudo />
-    </Suspense>
+    <PaginaProtegida tela="tempos">
+      <Suspense fallback={<div className="h-96" aria-busy="true" />}>
+        <TemposConteudo />
+      </Suspense>
+    </PaginaProtegida>
   )
 }

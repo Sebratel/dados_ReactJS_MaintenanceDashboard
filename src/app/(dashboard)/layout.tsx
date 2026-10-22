@@ -3,10 +3,8 @@ import { Suspense } from 'react'
 import { Cabecalho } from '@/components/Cabecalho'
 import { BarraFiltros } from '@/components/filtros/BarraFiltros'
 import { SessaoFirebase } from '@/components/SessaoFirebase'
-import { SemAcesso } from '@/components/SemAcesso'
 import { obterConfigFirebase } from '@/server/auth/configCliente'
 import { resolverAcesso } from '@/server/auth/acesso'
-import { telaDoCaminho } from '@/config/telas'
 
 /**
  * ESTE LAYOUT É DINÂMICO DE PROPÓSITO, e a razão é de correção, não de gosto.
@@ -29,41 +27,35 @@ import { telaDoCaminho } from '@/config/telas'
  * família: **nada que dependa do ambiente pode ser avaliado na importação de um
  * módulo nem em rota estática.**
  *
- * Agora há um segundo motivo, igualmente forte: a AUTORIZAÇÃO acontece aqui, e
- * ela depende de quem está pedindo. Resposta que varia por pessoa não pode ser
- * um arquivo servido a todo mundo.
+ * Há um segundo motivo, igualmente forte: a navegação que ele monta depende de
+ * quem está pedindo. Resposta que varia por pessoa não pode ser um arquivo
+ * servido a todo mundo.
  */
 export const dynamic = 'force-dynamic'
 
 export default async function LayoutDashboard({ children }: { children: React.ReactNode }) {
   /**
-   * Os dois cabeçalhos vêm do middleware, que os apaga da requisição de entrada
-   * antes de escrevê-los — ver `middleware.ts`. Ler daqui é ler o que o portão
+   * O e-mail vem do middleware, que apaga o cabeçalho da requisição de entrada
+   * antes de escrevê-lo — ver `middleware.ts`. Ler daqui é ler o que o portão
    * verificou, não o que o navegador afirmou.
    */
-  const h = await headers()
-  const email = h.get('x-usuario-email') ?? ''
-  const caminho = h.get('x-caminho') ?? '/'
-
-  const acesso = await resolverAcesso(email)
-  const tela = telaDoCaminho(caminho)
+  const email = (await headers()).get('x-usuario-email') ?? ''
 
   /**
-   * A decisão de bloquear mora AQUI, num lugar só, e não em cada página.
+   * ⚠️ ESTE LAYOUT NÃO DECIDE MAIS QUEM ABRE A TELA — item Z de docs/06.
    *
-   * Se estivesse em cada `page.tsx`, a página nova nasceria aberta por omissão —
-   * e esquecimento de autorização não aparece como erro na tela: aparece como
-   * alguém vendo desempenho nominal de técnico que não devia ver. Aqui o padrão
-   * é o contrário: rota que não está no catálogo de telas só passa se for
-   * reconhecida abaixo.
+   * A decisão morava aqui e lia `x-caminho`. O App Router reaproveita o layout
+   * compartilhado quando só a página muda, então na navegação por clique ele
+   * decidia com o caminho da tela ANTERIOR. Agora cada `page.tsx` passa por
+   * `<PaginaProtegida>`, que roda a cada navegação; e `telas.test.ts` quebra o
+   * build se uma página nascer sem ele, que era o motivo de a decisão ter vindo
+   * para o layout.
+   *
+   * O que sobra aqui é CONFORTO: a navegação mostra só as telas que a pessoa
+   * abre. Num rebaixamento com a sessão aberta o menu fica velho até o F5 — mas
+   * a tela não abre mais, que era o problema.
    */
-  const ehConfiguracoes = caminho === '/configuracoes'
-  const permitido = ehConfiguracoes
-    ? acesso.papel === 'admin'
-    : tela
-      ? acesso.telas.has(tela.id)
-      : true // rota do grupo que não é tela de dados nem configurações
-
+  const acesso = await resolverAcesso(email)
   const telasPermitidas = [...acesso.telas]
 
   return (
@@ -77,8 +69,9 @@ export default async function LayoutDashboard({ children }: { children: React.Re
      */
     <SessaoFirebase config={obterConfigFirebase()}>
       {/* Suspense porque os dois leem a query string (`useSearchParams`). As
-          alturas do fallback são as reais, para a tela não pular. */}
-      <Suspense fallback={<div className="h-[45px]" />}>
+          alturas do fallback são as reais (topo 52 + navegação 36; barra 50),
+          para a tela não pular. */}
+      <Suspense fallback={<div style={{ height: 88 }} />}>
         <Cabecalho
           papel={acesso.papel}
           telasPermitidas={telasPermitidas}
@@ -86,37 +79,15 @@ export default async function LayoutDashboard({ children }: { children: React.Re
         />
       </Suspense>
 
-      {permitido ? (
-        <>
-          {/*
-            A barra só existe nas telas de dados — mas QUEM DECIDE ISSO é a
-            própria `BarraFiltros`, pelo `usePathname()`, e não este layout.
-
-            Aqui havia um `{!ehConfiguracoes && …}`. A regra era a certa e o
-            valor é que não chegava: `ehConfiguracoes` sai de `x-caminho`, e o
-            App Router reaproveita o layout compartilhado quando só a página
-            muda — ele ficava com o caminho da tela ANTERIOR. O sintoma feio não
-            era a barra sobrando em Configurações, era ela SUMINDO de Tempos na
-            volta pelo menu, deixando a tela sem filtro nenhum.
-
-            ⚠️ MESMA CAUSA, OUTRA METADE: o `permitido` acima sai do MESMO
-            `caminho` congelado. Isto aqui não conserta aquilo — ver item Z de
-            docs/06 e conversar com quem escreveu a matriz de acesso.
-          */}
-          <Suspense fallback={<div className="h-[49px]" />}>
-            <BarraFiltros />
-          </Suspense>
-          <main className="px-4 py-4">{children}</main>
-        </>
-      ) : (
-        <main className="px-4 py-4">
-          <SemAcesso
-            tela={tela?.rotulo ?? 'Configurações'}
-            email={acesso.email}
-            ehConfiguracoes={ehConfiguracoes}
-          />
-        </main>
-      )}
+      {/*
+        A barra só existe nas telas de dados — e QUEM DECIDE ISSO é a própria
+        `BarraFiltros`, pelo `usePathname()`, não este layout. Pelo mesmo motivo
+        do item Z: o caminho que o layout enxerga é o da tela anterior.
+      */}
+      <Suspense fallback={<div style={{ height: 50 }} />}>
+        <BarraFiltros />
+      </Suspense>
+      <main className="px-4 py-4">{children}</main>
     </SessaoFirebase>
   )
 }

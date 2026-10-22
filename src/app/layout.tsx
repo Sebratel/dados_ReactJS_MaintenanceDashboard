@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import './casca.css'
+import './padrao.css'
 import { Provedores } from '@/components/Provedores'
 
 /**

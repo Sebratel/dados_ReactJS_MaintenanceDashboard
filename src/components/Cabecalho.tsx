@@ -3,16 +3,32 @@
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { BotaoAtualizar } from './BotaoAtualizar'
+import { Icone } from './Icone'
 import { MenuUsuario } from './MenuUsuario'
 
 import { TELAS, type IdTela, type Papel } from '@/config/telas'
+
+/**
+ * Cabeçalho padrão Sebratel (casca da skill padrao-frontend-dashboards): topo de
+ * 52px + navegação de 36px, igual ao do COM · Gestão Comercial.
+ *
+ *  ┌──────────────────────────────────────────────────────────────────────────┐
+ *  │ [logo] MAN · MANUTENÇÃO FTTX     TÍTULO DA TELA     ● há 2 min [↻]  (M) │
+ *  ├──────────────────────────────────────────────────────────────────────────┤
+ *  │ CAPA  EXECUTIVO  OPERAÇÃO  TEMPOS ...                    [⚙] CONFIG.     │
+ *  └──────────────────────────────────────────────────────────────────────────┘
+ *
+ * A mesma sigla aparece no topo, na Capa, na etiqueta do login e no <title>.
+ */
+const SISTEMA = 'MAN · MANUTENÇÃO FTTX'
 
 /**
  * A navegação sai do CATÁLOGO de telas, não de uma lista própria.
  *
  * Antes eram duas listas, e duas listas divergem: a tela nova entrava na
  * navegação e não na matriz de acesso, ficando visível para todo mundo sem
- * ninguém decidir isso. Agora `config/telas.ts` é a fonte das duas.
+ * ninguém decidir isso. Agora `config/telas.ts` é a fonte das duas. A Capa fica
+ * fora do catálogo (é de todos) e entra à frente, como em todo dashboard.
  */
 const NAV = TELAS.map((t) => ({ href: t.caminho, label: t.rotulo, id: t.id }))
 
@@ -33,13 +49,14 @@ const CORTES_DA_TELA: Record<string, string> = {
   retorno: '/protocolos',
 }
 
-/** A query que sobrevive ao ir para `destino`. */
-function queryPara(destino: string, sp: URLSearchParams): string {
+/** O endereço de `destino` levando junto o recorte que sobrevive lá. */
+function hrefPara(destino: string, sp: URLSearchParams): string {
   const q = new URLSearchParams(sp)
   for (const [corte, tela] of Object.entries(CORTES_DA_TELA)) {
     if (destino !== tela) q.delete(corte)
   }
-  return q.toString()
+  const s = q.toString()
+  return s ? `${destino}?${s}` : destino
 }
 
 export function Cabecalho({
@@ -57,96 +74,63 @@ export function Cabecalho({
   /**
    * A navegação mostra só o que a pessoa pode abrir.
    *
-   * Isto é conforto, NÃO é a barreira: quem digitar o endereço direto continua
-   * batendo na checagem do layout, e a API tem a sua. Esconder o link evita o
-   * clique que leva a uma tela de "sem acesso" — que é frustração sem
-   * informação, já que a pessoa não pediu nada errado.
+   * Isto é conforto, NÃO é a barreira: quem digitar o endereço direto bate em
+   * `PaginaProtegida`, e a API tem a sua checagem. Esconder o link evita o
+   * clique que leva a uma tela de "sem acesso" — frustração sem informação, já
+   * que a pessoa não pediu nada errado.
    */
   const permitidas = new Set(telasPermitidas)
   const nav = NAV.filter((n) => permitidas.has(n.id))
 
+  const titulo =
+    pathname === '/configuracoes'
+      ? 'Configurações'
+      : pathname === '/capa'
+        ? 'Capa'
+        : (NAV.find((n) => n.href === pathname)?.label ?? SISTEMA)
+
+  const classe = (href: string) => (pathname === href ? 'active' : '')
+
   return (
-    <header
-      className="border-b"
-      style={{ borderColor: 'var(--border)', background: 'var(--surface-1)' }}
-    >
-      <div className="flex items-center gap-4 px-4 py-2.5">
-        {/* marca — vermelho Sebratel vive AQUI, no chrome, nunca como série */}
-        <Link
-          href={`/${queryPara('/', sp) ? `?${queryPara('/', sp)}` : ''}`}
-          className="flex shrink-0 items-center gap-2"
-        >
-          {/*
-            O ARQUIVO OFICIAL, não um desenho meu. A primeira versão redesenhava
-            a esfera em SVG para acompanhar o tema — ficou parecida e errada: a
-            marca da Sebratel tem a malha de losangos, não meridianas, e marca
-            não é lugar para aproximação. É o MESMO arquivo do Data Hub
-            (`logo-circular-sebratel.png`), então os dois sistemas internos
-            mostram exatamente o mesmo símbolo.
-
-            O PNG é RGBA: os vazados da malha são transparentes, então ele se
-            apoia no fundo dos dois temas sem precisar de variante.
-          */}
-          <img
-            src="/logo-circular-sebratel.png"
-            alt=""
-            width={28}
-            height={28}
-            className="size-7 shrink-0"
-          />
-          <span className="flex flex-col leading-none">
-            {/* nowrap: sem isto o título quebra em "Manutenção / FTTX" quando a
-                janela aperta, e a marca fica com o dobro da altura do resto do
-                cabeçalho — some o alinhamento de tudo que está ao lado. */}
-            <span className="text-[13px] font-semibold whitespace-nowrap text-[var(--text-primary)]">
-              Manutenção FTTX
-            </span>
-            {/* "SEBRATEL" em vermelho e caixa alta espaçada: é o wordmark da
-                empresa, não um subtítulo — por isso não usa a cor de texto
-                secundário como o resto do chrome. O tracking é o mesmo do Data
-                Hub (0.14em), para as duas marcas lerem como a mesma família. */}
-            <span
-              className="mt-0.5 text-[9px] font-bold tracking-[0.14em]"
-              style={{ color: 'var(--brand)' }}
-            >
-              SEBRATEL
-            </span>
-          </span>
+    <>
+      <header className="topbar">
+        <Link href={hrefPara('/', sp)} className="logo" title="Ir para o Executivo">
+          <img src="/logo-sebratel.svg" alt="Sebratel" />
+          <span>{SISTEMA}</span>
         </Link>
+        <h1>{titulo}</h1>
+        <BotaoAtualizar />
+        <MenuUsuario papel={papel} controleAtivo={controleAtivo} />
+      </header>
 
-        <nav className="flex items-center gap-0.5" aria-label="Seções">
-          {nav.map((n) => {
-            const ativo = pathname === n.href
-            const q = queryPara(n.href, sp)
-            return (
-              <Link
-                key={n.href}
-                href={q ? `${n.href}?${q}` : n.href}
-                aria-current={ativo ? 'page' : undefined}
-                className="relative rounded px-2.5 py-1.5 text-xs font-medium transition-colors"
-                style={{
-                  color: ativo ? 'var(--text-primary)' : 'var(--text-muted)',
-                  background: ativo ? 'var(--surface-page)' : 'transparent',
-                }}
-              >
-                {n.label}
-                {ativo && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute inset-x-2.5 -bottom-[9px] h-0.5 rounded-full"
-                    style={{ background: 'var(--brand)' }}
-                  />
-                )}
-              </Link>
-            )
-          })}
-        </nav>
-
-        <div className="ml-auto flex items-center gap-3">
-          <BotaoAtualizar />
-          <MenuUsuario papel={papel} controleAtivo={controleAtivo} />
-        </div>
-      </div>
-    </header>
+      <nav className="pagenav" aria-label="Telas do painel">
+        <Link
+          href={hrefPara('/capa', sp)}
+          className={classe('/capa')}
+          aria-current={pathname === '/capa' ? 'page' : undefined}
+        >
+          Capa
+        </Link>
+        {nav.map((n) => (
+          <Link
+            key={n.href}
+            href={hrefPara(n.href, sp)}
+            className={classe(n.href)}
+            aria-current={pathname === n.href ? 'page' : undefined}
+          >
+            {n.label}
+          </Link>
+        ))}
+        {papel === 'admin' && (
+          <Link
+            href="/configuracoes"
+            className={`com-icone a-direita ${classe('/configuracoes')}`}
+            aria-current={pathname === '/configuracoes' ? 'page' : undefined}
+          >
+            <Icone nome="config" tamanho={13} /> Configurações
+          </Link>
+        )}
+      </nav>
+    </>
   )
 }
