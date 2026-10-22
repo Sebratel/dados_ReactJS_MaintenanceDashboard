@@ -48,12 +48,26 @@ export function obterPoolMaria(): Pool {
   return novo
 }
 
+/** Última leitura e última falha do Data Hub — mesma ideia de `estadoErp()`. */
+const estado = { ultimaLeitura: 0, ultimaFalha: 0 }
+
+export function estadoMaria(): { ultimaLeitura: number; ultimaFalha: number } {
+  return { ...estado }
+}
+
 export async function consultarMaria<T extends RowDataPacket>(
   sql: string,
   params: readonly unknown[] = []
 ): Promise<{ rows: T[]; ms: number }> {
   const t0 = performance.now()
-  const [rows] = await obterPoolMaria().query<T[]>(sql, params as unknown[])
+  let rows: T[]
+  try {
+    ;[rows] = await obterPoolMaria().query<T[]>(sql, params as unknown[])
+  } catch (e) {
+    estado.ultimaFalha = Date.now()
+    throw e
+  }
+  estado.ultimaLeitura = Date.now()
   const ms = Math.round(performance.now() - t0)
   return { rows, ms }
 }

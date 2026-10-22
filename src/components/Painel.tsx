@@ -2,9 +2,23 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { baixarCsv, copiar, nomeDeArquivo, paraCsv, paraTsv } from '@/lib/exportar'
+import { semEmoji } from '@/lib/formato'
 import { ExplicarIA } from './ExplicarIA'
+import { Icone } from './Icone'
+import { Segmentado } from './Segmentado'
 
 export type ColunaTabela = { chave: string; rotulo: string; alinhar?: 'esq' | 'dir' }
+
+/**
+ * A altura do card, em fração da área útil da tela (padrao.css). É o que faz
+ * duas faixas caberem numa tela e nenhum gráfico passar da altura da janela.
+ *
+ * - `v-grafico` / `v-tabela`: as duas faixas que somam uma tela (0,455 + 0,545)
+ * - `v-meia`: meia tela, para duas faixas iguais
+ * - `v-cheia`: a área útil inteira, para o visual que é a tela
+ * - `v-auto`: altura do conteúdo — o gráfico dentro precisa de `altura` própria
+ */
+export type ClasseAltura = 'v-grafico' | 'v-tabela' | 'v-meia' | 'v-cheia' | 'v-auto'
 
 export type PainelProps = {
   titulo: string
@@ -14,16 +28,32 @@ export type PainelProps = {
   children: ReactNode
   /**
    * Visão de tabela — obrigatória em todo gráfico.
-   * Além de acessibilidade, é o "canal de alívio" exigido pelo guia de dataviz
-   * para os slots de série que ficam abaixo de 3:1 na superfície clara.
+   * Além de acessibilidade, é o "canal de alívio" que deixa conferir o número
+   * por trás de cada barra, e é ela que vai para o Copiar, o CSV e a IA.
    */
   tabela?: { colunas: ColunaTabela[]; linhas: Record<string, string | number>[] }
   acoes?: ReactNode
+  /** posição no grid da página (ex.: ocupar duas colunas) — não mexe em altura */
   className?: string
+  classe?: ClasseAltura
   carregando?: boolean
   erro?: string | null
+  /**
+   * Força o estado vazio. Sem isto, o painel se declara vazio quando a tabela
+   * dele não tem linha — que cobre quase todos os casos.
+   */
+  vazio?: boolean
 }
 
+/**
+ * Card de visual no padrão Sebratel (o `Visual` da skill): barra na cor
+ * primária com o título e as ações "desta visão", subtítulo que diz o que a
+ * pessoa está vendo, corpo e rodapé.
+ *
+ * OS TRÊS ESTADOS NÃO SÃO OPCIONAIS. Tela de dashboard passa a vida carregando,
+ * filtrando para vazio e tomando erro de rede; sem os três, o card fica branco
+ * e a pessoa conclui que o número é zero.
+ */
 export function Painel({
   titulo,
   descricao,
@@ -32,8 +62,10 @@ export function Painel({
   tabela,
   acoes,
   className = '',
+  classe = 'v-grafico',
   carregando = false,
   erro = null,
+  vazio,
 }: PainelProps) {
   const [modo, setModo] = useState<'grafico' | 'tabela'>('grafico')
 
@@ -64,24 +96,17 @@ export function Painel({
     baixarCsv(nomeDeArquivo(titulo), paraCsv(tabela.colunas, tabela.linhas))
   }
 
+  const semDados = vazio ?? (tabela !== undefined && tabela.linhas.length === 0)
+
   return (
-    // `relative` ancora o balao da leitura por IA logo abaixo do cabecalho —
-    // sem isso ele se posiciona pela pagina e aparece longe do painel que
-    // explicou.
-    <section
-      className={`relative flex flex-col rounded-lg border bg-[var(--surface-1)] ${className}`}
-      style={{ borderColor: 'var(--border)' }}
-    >
-      <header className="flex items-start justify-between gap-3 px-4 pt-3.5 pb-2">
-        <div className="min-w-0">
-          <h2 className="text-[13px] font-semibold tracking-wide uppercase text-[var(--text-secondary)]">
-            {titulo}
-          </h2>
-          {descricao && (
-            <p className="mt-0.5 text-xs text-[var(--text-muted)]">{descricao}</p>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
+    <section className={`visual ${classe} ${className}`} aria-label={titulo}>
+      {/*
+        `position: relative` na barra (padrao.css) ancora o balão da leitura por
+        IA logo abaixo dela, sobre o corpo do card que ele explica.
+      */}
+      <div className="visual-cab" style={{ position: 'relative' }}>
+        <h2 title={titulo}>{titulo}</h2>
+        <div className="acoes">
           {/*
             Exportação só aparece na visão de tabela, e de propósito: é ali que a
             pessoa está conferindo número. No gráfico, o botão seria mais um
@@ -93,42 +118,33 @@ export function Painel({
           */}
           {tabela && modo === 'tabela' && (
             <>
-              <span className="mr-1 text-[11px] text-[var(--text-muted)] tabular-nums">
-                {tabela.linhas.length}{' '}
-                {tabela.linhas.length === 1 ? 'linha' : 'linhas'}
+              <span style={{ fontSize: 11, opacity: 0.85 }} className="tabular">
+                {tabela.linhas.length} {tabela.linhas.length === 1 ? 'linha' : 'linhas'}
               </span>
               <button
                 type="button"
                 onClick={aoCopiar}
                 title="Copia a tabela para colar direto no Excel"
-                className="rounded border px-2 py-1 text-[11px] transition-colors hover:text-[var(--text-primary)]"
-                style={{
-                  borderColor: 'var(--border)',
-                  color:
-                    copia === 'ok'
-                      ? 'var(--status-good)'
-                      : copia === 'erro'
-                        ? 'var(--status-critical)'
-                        : 'var(--text-muted)',
-                }}
+                className={`btn-cab${copia === 'ok' ? ' ok' : copia === 'erro' ? ' falhou' : ''}`}
                 aria-live="polite"
               >
+                <Icone nome={copia === 'ok' ? 'ok' : 'copiar'} tamanho={11} />
                 {copia === 'ok' ? 'copiado' : copia === 'erro' ? 'falhou' : 'Copiar'}
               </button>
               <button
                 type="button"
                 onClick={aoBaixar}
                 title="Baixa um arquivo CSV com o período no nome"
-                className="rounded border px-2 py-1 text-[11px] text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
-                style={{ borderColor: 'var(--border)' }}
+                className="btn-cab"
               >
+                <Icone nome="baixar" tamanho={11} />
                 CSV
               </button>
             </>
           )}
           {/*
-            "Explicar" so aparece com tabela, porque e a tabela que vai para o
-            provedor. Num painel sem visao de tabela nao havia o que mandar.
+            "Explicar" só aparece com tabela, porque é a tabela que vai para o
+            provedor. Num painel sem visão de tabela não havia o que mandar.
           */}
           {tabela && tabela.linhas.length > 0 && (
             <ExplicarIA
@@ -140,59 +156,44 @@ export function Painel({
           )}
           {acoes}
           {tabela && (
-            <div
-              className="flex overflow-hidden rounded border text-[11px]"
-              style={{ borderColor: 'var(--border)' }}
-              role="group"
-              aria-label="alternar visualização"
-            >
-              {(['grafico', 'tabela'] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setModo(m)}
-                  aria-pressed={modo === m}
-                  className={`px-2 py-1 transition-colors ${
-                    modo === m
-                      ? 'bg-[var(--brand)] text-[var(--brand-ink)]'
-                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                  }`}
-                >
-                  {m === 'grafico' ? 'Gráfico' : 'Tabela'}
-                </button>
-              ))}
-            </div>
+            <Segmentado
+              rotulo="alternar visualização"
+              valor={modo}
+              aoMudar={setModo}
+              opcoes={[
+                { valor: 'grafico', rotulo: 'Gráfico' },
+                { valor: 'tabela', rotulo: 'Tabela' },
+              ]}
+            />
           )}
         </div>
-      </header>
+      </div>
 
-      <div className="relative min-h-0 flex-1 px-2 pb-3">
+      {descricao && <div className="visual-sub">{descricao}</div>}
+
+      <div className="visual-corpo">
         {erro ? (
-          <div className="flex h-full min-h-[200px] items-center justify-center px-4">
-            <p className="text-center text-sm text-[var(--status-critical)]">
-              <span aria-hidden="true">⚠ </span>
+          <div className="estado erro" role="alert">
+            <span className="linha">
+              <Icone nome="alerta" tamanho={14} />
               {erro}
-            </p>
+            </span>
           </div>
         ) : carregando ? (
-          <div className="flex h-full min-h-[200px] items-center justify-center">
-            <span className="text-xs text-[var(--text-muted)]">carregando…</span>
+          <div className="estado" role="status" aria-label="Carregando">
+            <div className="carregando-barra" />
           </div>
+        ) : semDados ? (
+          <div className="estado">Sem dados para este recorte.</div>
         ) : modo === 'grafico' || !tabela ? (
           children
         ) : (
-          <div className="max-h-[320px] overflow-auto px-2">
-            <table className="tabular w-full text-xs">
-              <thead className="sticky top-0 bg-[var(--surface-1)]">
-                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+          <div className="tabela-caixa">
+            <table className="tabela">
+              <thead>
+                <tr>
                   {tabela.colunas.map((c) => (
-                    <th
-                      key={c.chave}
-                      scope="col"
-                      className={`py-1.5 pr-3 font-medium text-[var(--text-secondary)] ${
-                        c.alinhar === 'dir' ? 'text-right' : 'text-left'
-                      }`}
-                    >
+                    <th key={c.chave} scope="col" className={c.alinhar === 'dir' ? '' : 'texto'}>
                       {c.rotulo}
                     </th>
                   ))}
@@ -200,17 +201,17 @@ export function Painel({
               </thead>
               <tbody>
                 {tabela.linhas.map((l, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                    {tabela.colunas.map((c) => (
-                      <td
-                        key={c.chave}
-                        className={`py-1.5 pr-3 text-[var(--text-primary)] ${
-                          c.alinhar === 'dir' ? 'text-right' : 'text-left'
-                        }`}
-                      >
-                        {l[c.chave] ?? '—'}
-                      </td>
-                    ))}
+                  <tr key={i}>
+                    {tabela.colunas.map((c) => {
+                      const v = l[c.chave]
+                      // emoji do banco (o ✅ das bases) sai só da TELA: Copiar e
+                      // CSV levam o valor cru, que é o que bate com o Voalle
+                      return (
+                        <td key={c.chave} className={c.alinhar === 'dir' ? '' : 'texto'}>
+                          {v === undefined || v === null ? '—' : typeof v === 'string' ? semEmoji(v) : v}
+                        </td>
+                      )
+                    })}
                   </tr>
                 ))}
               </tbody>
@@ -219,14 +220,7 @@ export function Painel({
         )}
       </div>
 
-      {nota && (
-        <footer
-          className="px-4 pt-1.5 pb-2.5 text-[11px] text-[var(--text-muted)]"
-          style={{ borderTop: '1px solid var(--border)' }}
-        >
-          {nota}
-        </footer>
-      )}
+      {nota && <div className="visual-nota">{nota}</div>}
     </section>
   )
 }

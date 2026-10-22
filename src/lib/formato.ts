@@ -103,6 +103,51 @@ export function fmtPeriodo(iso: string, granularidade: 'dia' | 'semana' | 'mes')
   return `${d}/${m}`
 }
 
+/**
+ * Idade de um instante: "agora há pouco", "há 4 min", "há 2 h", "há 3 dias".
+ *
+ * Recebe ISO (com ou sem fuso) ou milissegundos. É a idade do DADO, e quem
+ * chama decide de qual dado: o cabeçalho passa o mais velho que está na tela.
+ */
+export function haQuanto(quando: string | number, agora = Date.now()): string {
+  const t = typeof quando === 'number' ? quando : Date.parse(quando)
+  if (!Number.isFinite(t)) return '—'
+  const min = Math.floor(Math.max(0, agora - t) / 60_000)
+  if (min < 1) return 'agora há pouco'
+  if (min < 60) return `há ${min} min`
+  const h = Math.floor(min / 60)
+  if (h < 24) return `há ${h} h`
+  const d = Math.floor(h / 24)
+  return d === 1 ? 'há 1 dia' : `há ${d} dias`
+}
+
+/** Instante → "22/10/2026 08:43", no fuso de quem está lendo. */
+export function fmtInstante(quando: string | number): string {
+  const t = typeof quando === 'number' ? quando : Date.parse(quando)
+  if (!Number.isFinite(t)) return '—'
+  return new Date(t).toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+/**
+ * Tira emoji de um RÓTULO vindo do banco, só para exibir.
+ *
+ * O `region_title` da agenda do Voalle vem com um ✅ na frente
+ * ("✅Base São Leopoldo"). A casca não usa emoji em lugar nenhum, nem herdado
+ * da origem: ele muda de desenho por sistema operacional e desalinha a linha.
+ * ⚠️ É só para a tela — o valor que vai para o filtro e para a URL continua o
+ * original, senão o recorte deixaria de casar com o banco.
+ */
+const PICTOGRAFICO = new RegExp('[\\p{Extended_Pictographic}\\u{FE0F}]', 'gu')
+export function semEmoji(texto: string): string {
+  return texto.replace(PICTOGRAFICO, '').trim()
+}
+
 /** Sinal explícito para variação: "+12,3%" / "−4,1%" */
 export function fmtVariacao(n: number | null | undefined): string {
   if (n === null || n === undefined || !Number.isFinite(n)) return '—'

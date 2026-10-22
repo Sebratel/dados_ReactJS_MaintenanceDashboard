@@ -11,9 +11,11 @@ import {
   useRanking,
   useSerie,
 } from '@/lib/useIndicador'
+import { Icone } from '@/components/Icone'
 import { Painel } from '@/components/Painel'
 import { LinkHistorico } from '@/components/LinkHistorico'
 import { StatTile } from '@/components/kpi/StatTile'
+import { Kpis } from '@/components/kpi/Kpis'
 import { SerieTemporal } from '@/components/charts/SerieTemporal'
 import { SerieMttr } from '@/components/charts/SerieMttr'
 import { RankingBarras } from '@/components/charts/RankingBarras'
@@ -75,13 +77,9 @@ export function VisaoExecutivaConteudo() {
   }, [coef.data, filtros.de, filtros.ate])
 
   return (
-    <div className="mx-auto flex max-w-[1600px] flex-col gap-4">
+    <div className="pagina com-kpis">
       {/* ── KPIs de topo ── */}
-      <section
-        className="grid gap-3"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}
-        aria-label="Indicadores principais"
-      >
+      <Kpis rotulo="Indicadores principais">
         <StatTile
           rotulo="Protocolos abertos"
           valor={kpis.isLoading ? '…' : fmtInt(k?.protocolos)}
@@ -150,13 +148,19 @@ export function VisaoExecutivaConteudo() {
           contexto="deslocamento + atendimento"
           subirEhRuim
         />
-      </section>
+      </Kpis>
 
-      {/* ── série: abertos x encerrados + MTTR (eixos separados, nunca duplo) ── */}
-      <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)' }}>
-        <div className="flex flex-col gap-4">
+      {/*
+        ── série: abertos x encerrados + MTTR (eixos separados, nunca duplo) ──
+        Fluxo e MTTR empilhados na MESMA coluna: os dois têm o tempo no eixo X, e
+        a mesma largura alinha os períodos. As cidades, à direita, ocupam a
+        altura das duas faixas (`v-cheia` = área útil inteira).
+      */}
+      <div className="faixa dois-tercos">
+        <div className="coluna">
           <Painel
             titulo="Fluxo: criados e saldo do backlog"
+            classe="v-grafico"
             descricao={`Barra = criados, linha = saldo (entra − sai): acima da tracejada o backlog cresceu. Encerrados fica no tooltip e na aba Tabela. ${fmtData(filtros.de)} a ${fmtData(filtros.ate)} · criados pela data de criação, encerrados pela data de encerramento`}
             carregando={serie.isLoading}
             erro={serie.error ? String(serie.error.message) : null}
@@ -192,7 +196,6 @@ export function VisaoExecutivaConteudo() {
               <SerieTemporal
                 dados={serie.data.data}
                 granularidade={filtros.granularidade}
-                altura={250}
                 comZoom={serie.data.data.length > 45}
               />
             )}
@@ -200,6 +203,7 @@ export function VisaoExecutivaConteudo() {
 
           <Painel
             titulo="MTTR médio"
+            classe="v-tabela"
             descricao="Tempo médio entre criação e encerramento"
             carregando={serie.isLoading}
             erro={serie.error ? String(serie.error.message) : null}
@@ -223,13 +227,14 @@ export function VisaoExecutivaConteudo() {
             }}
           >
             {serie.data && (
-              <SerieMttr dados={serie.data.data} granularidade={filtros.granularidade} altura={180} />
+              <SerieMttr dados={serie.data.data} granularidade={filtros.granularidade} />
             )}
           </Painel>
         </div>
 
         <Painel
           titulo="Protocolos por cidade"
+          classe="v-cheia"
           descricao={cidades.data ? `Total ${fmtInt(cidades.data.meta.total)}` : undefined}
           carregando={cidades.isLoading}
           erro={cidades.error ? String(cidades.error.message) : null}
@@ -248,7 +253,7 @@ export function VisaoExecutivaConteudo() {
             })),
           }}
         >
-          {cidades.data && <RankingBarras dados={cidades.data.data} altura={468} />}
+          {cidades.data && <RankingBarras dados={cidades.data.data} />}
         </Painel>
       </div>
 
@@ -267,8 +272,12 @@ export function VisaoExecutivaConteudo() {
               {coef.data.meta.diasInterpolados > 0 && (
                 <>
                   {' · '}
-                  <span style={{ color: 'var(--status-warning)' }}>
-                    ⚠ {coef.data.meta.diasInterpolados}{' '}
+                  <span
+                    className="inline-flex items-center gap-1"
+                    style={{ color: 'var(--status-warning)' }}
+                  >
+                    <Icone nome="alerta" tamanho={12} />
+                    {coef.data.meta.diasInterpolados}{' '}
                     {coef.data.meta.diasInterpolados === 1 ? 'dia' : 'dias'} com base estimada
                     (sem snapshot) — barra tracejada
                   </span>
@@ -298,7 +307,7 @@ export function VisaoExecutivaConteudo() {
           })),
         }}
       >
-        {coef.data && <CoeficienteVsMeta dados={coef.data.data} altura={230} />}
+        {coef.data && <CoeficienteVsMeta dados={coef.data.data} />}
       </Painel>
     </div>
   )

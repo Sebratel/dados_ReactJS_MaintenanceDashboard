@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { PaginaProtegida } from '@/components/PaginaProtegida'
 import { OperacaoConteudo } from './Conteudo'
 
 /**
@@ -10,8 +11,10 @@ import { OperacaoConteudo } from './Conteudo'
  */
 export default function Pagina() {
   return (
-    <Suspense fallback={<div className="h-96" aria-busy="true" />}>
-      <OperacaoConteudo />
-    </Suspense>
+    <PaginaProtegida tela="operacao">
+      <Suspense fallback={<div className="h-96" aria-busy="true" />}>
+        <OperacaoConteudo />
+      </Suspense>
+    </PaginaProtegida>
   )
 }

@@ -130,6 +130,7 @@ src/
 
 | Rota | Página do Power BI equivalente | Estado |
 |---|---|---|
+| `/capa` | — (casca padrão Sebratel) | ✅ de todos: o que é o painel, fontes e definições |
 | `/` | Relatório Executivo | ✅ |
 | `/operacao` | Manutenção Campo + Protocolos Abertos Suporte | ✅ |
 | `/tempos` | Geral MTTs | ✅ |
@@ -216,23 +217,43 @@ contas — **quem controla acesso é `ALLOWED_DOMAIN` no servidor**.
 payload adulterado depois de assinado, token de outro projeto e domínio que
 apenas *termina* parecido com o autorizado.
 
-### A tela de login
+### A casca: login, cabeçalho, Capa e Configurações
 
-Segue o **mesmo padrão do COM · Gestão Comercial** (`comercial_pbi`): cena de
-marca à esquerda, card claro à direita com etiqueta do sistema, aviso de domínio
-e barra de rodapé. A porta de entrada dos sistemas internos é reconhecível entre
-si de propósito.
+Desde 22/10/2026 a moldura é a **casca padrão dos dashboards Sebratel** (skill
+`padrao-frontend-dashboards`), a mesma do COM · Gestão Comercial: tela de login,
+topo com `MAN · MANUTENÇÃO FTTX` e o título da tela, navegação em maiúsculas com
+a **Capa** primeiro e Configurações à direita, e o favicon com o logo circular.
+Os estilos são `src/app/casca.css`, **cópia fiel** do arquivo da skill — não
+editar lá; o que é só deste painel fica em `src/app/padrao.css`.
 
-O que muda em relação à de lá: a cor (vermelho da marca, não o vinho do
-relatório comercial — paleta se herda do relatório de origem, e as origens são
-diferentes) e o **motor**, que aqui é Firebase e lá é GSI. Copiar a tela não é
-copiar o mecanismo.
+O login copia a aparência, **não o motor**: lá é GSI, aqui é Firebase. Copiar a
+tela não é copiar o mecanismo.
 
-⚠️ Esta é a única tela que **não acompanha o alternador de tema**. Ela é uma cena
-de marca, fixa, e vem antes do cabeçalho — que é onde o alternador mora. Por isso
-as cores dela são literais, num módulo CSS próprio (`login.module.css`), e não
-tokens: token aqui viraria uma cena que se desmonta sozinha no tema escuro. As 8
-telas de dados seguem o tema normalmente.
+O ponto e o "há X" do topo são a idade do **dado** mais velho da tela
+(`meta.geradoEm` de cada indicador), não a hora em que o navegador buscou — o
+servidor pode servir um valor guardado por até 20× a validade dele enquanto
+recalcula. Dourado = mais de 30 min; vermelho = algum painel com erro.
+
+**Altura dos cards.** Cada painel tem uma `classe` de altura (`v-grafico`,
+`v-tabela`, `v-meia`, `v-cheia`, `v-auto`) que é fração da área útil da janela,
+e o gráfico preenche o card. A barra de filtros e a faixa de KPIs **medem a
+própria altura** e entram na conta (`useAlturaComoVariavel`), porque a barra
+quebra em duas linhas em telas estreitas. Conferido em 1440×900 e 1920×1080:
+KPIs + duas faixas cabem na janela. Abaixo disso valem os pisos da skill, e a
+página rola em vez de espremer o gráfico. Ranking com muitas barras rola dentro
+do próprio card.
+
+**Filtros com Aplicar.** Os filtros de lista guardam a marcação num rascunho e
+só viram URL no **Aplicar** — antes, cada caixa marcada era um recorte novo e
+uma consulta por painel no ERP. Lista com mais de 10 opções abre em diálogo com
+busca. O período personalizado só vale no **Aplicar período**, com as duas
+datas completas: o campo de data do Chrome mandava o ano pela metade (0002,
+0020…) a cada tecla, e "de 0002-10-01" é o histórico inteiro.
+
+A **Capa** (`/capa`) é de todo mundo que entrou e não consulta o ERP: o frescor
+sai das consultas que as telas já fazem, e a base de clientes é uma soma de um
+dia no Data Hub, guardada por 1 h (`src/server/status.ts`). `/` continua sendo o
+Executivo, para não quebrar link nem favorito.
 
 ### Controle de acesso — quem vê o quê
 
@@ -244,7 +265,7 @@ que **não fala com Postgres**.
 |---|---|
 | `src/middleware.ts` (Edge) | autenticação: a sessão é válida? |
 | `src/server/auth/acesso.ts` (Node) | autorização: esta pessoa vê esta tela? |
-| `src/app/(dashboard)/layout.tsx` | aplica a decisão nas 8 telas, num ponto só |
+| `src/components/PaginaProtegida.tsx` | aplica a decisão em cada `page.tsx` — roda a cada navegação; `telas.test.ts` quebra se uma página nascer sem ele |
 | `src/server/auth/guarda.ts` | aplica nas rotas de API |
 
 O middleware passa o caminho pedido em `x-caminho` e o e-mail verificado em
@@ -385,9 +406,15 @@ jeito nesse cenário: o navegador também não alcançaria o Google.)
   por encerramento) — com eixo único as duas linhas se sobrepõem em 99,7%.
 - **Nunca eixo duplo em gráfico.** Métricas de unidades diferentes vão para
   gráficos separados compartilhando o eixo X.
-- **Vermelho da marca (`#D80010`) só no chrome**, nunca como série de dados —
-  senão colide com o vermelho semântico de "crítico". Paleta categórica de 7
-  slots validada com o script do guia de dataviz.
+- **A paleta é a do relatório de origem: vinho `#880F17` e dourado `#D9B300`**,
+  a mesma do COM · Gestão Comercial (skill `padrao-frontend-dashboards`). Foi
+  contada nos `visual.json` do `MAN - Relatório Manutenção FTTX.pbip` em
+  22/10/2026: `#880F17` aparece 233 vezes, o dourado é a série principal. O
+  vermelho `#D80010` de antes saiu dos pixels do LOGO (docs/02 §8), não das cores
+  dos visuais — e por isso divergia. O vinho fica no chrome (barra de título,
+  navegação); as séries seguem a ordem fixa dourado → laranja → grafite, e o
+  vermelho de "crítico" (`#B3261E`) é reservado a estado. Sem tema escuro: a
+  casca Sebratel não tem.
 - **Timestamps do ERP são `timestamp without time zone`** e chegam como string
   crua. Todo cálculo de dia/mês/turno acontece no Postgres, nunca no JS.
 - **Visita improdutiva é contador INDEPENDENTE, não um status excludente.** Um

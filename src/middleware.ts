@@ -50,20 +50,25 @@ export const config = {
    * publicada no host, então a rota é alcançável pela rede. Ver o comentário
    * no próprio route.ts.
    *
-   * `logo-sebratel.png` entrou na lista com o SSO, e o motivo é bom de guardar:
-   * a tela de login usa o logo, e quem a vê é exatamente quem ainda não tem
-   * sessão. Protegido, ele era redirecionado para `/login` e a tela de login
-   * abria com a marca quebrada — um ícone de imagem faltando na primeira tela
-   * do sistema. Com a credencial Basic isso não aparecia, porque o navegador
-   * reenviava a mesma credencial para a imagem.
+   * O logo entrou na lista com o SSO, e o motivo é bom de guardar: a tela de
+   * login usa o logo, e quem a vê é exatamente quem ainda não tem sessão.
+   * Protegido, ele era redirecionado para `/login` e a tela de login abria com
+   * a marca quebrada — um ícone de imagem faltando na primeira tela do sistema.
+   * Com a credencial Basic isso não aparecia, porque o navegador reenviava a
+   * mesma credencial para a imagem.
+   *
+   * Desde a casca padrão (22/10/2026) são dois logos com os nomes da skill —
+   * `logo-circular-sebratel.png` e o `logo-sebratel.svg` do topo — mais o
+   * favicon, que o App Router serve em `/icon.png` e `/apple-icon.png`. A lista
+   * antiga liberava `icon.svg`, que nunca existiu: o favicon da tela de login
+   * caía no redirecionamento e aparecia quebrado na aba.
    *
    * ⚠️ A exclusão é NOMINAL, e não um `.*\\..*` que liberaria todo arquivo com
-   * extensão: este é o único arquivo público do projeto, e qualquer outro que
-   * nasça em `public/` deve ser uma decisão consciente de publicar, não um
-   * efeito colateral de ter ponto no nome.
+   * extensão: qualquer outro arquivo que nasça em `public/` deve ser uma decisão
+   * consciente de publicar, não um efeito colateral de ter ponto no nome.
    */
   matcher: [
-    '/((?!_next/static|_next/image|favicon\\.ico|icon\\.svg|logo-sebratel\\.png|api/health).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|icon\\.png|apple-icon\\.png|logo-circular-sebratel\\.png|logo-sebratel\\.svg|api/health).*)',
   ],
 }
 

@@ -2,8 +2,15 @@
 
 import { useMemo } from 'react'
 import { Chart } from './Chart'
-import { lerTokens, MARCA, baseEixoCategoria, baseEixoValor, baseGrid, baseTooltip } from '@/lib/tema'
-import { useTemaAtual } from '@/lib/useTema'
+import {
+  lerTokens,
+  MARCA,
+  baseEixoCategoria,
+  baseEixoValor,
+  baseGrid,
+  baseTooltip,
+  gradienteColuna,
+} from '@/lib/tema'
 import { fmtInt, fmtPeriodo } from '@/lib/formato'
 import type { PontoSerie } from '@/server/indicadores/serie'
 import type { Granularidade } from '@/lib/filtros'
@@ -21,7 +28,7 @@ import type { Granularidade } from '@/lib/filtros'
 export function SerieTemporal({
   dados,
   granularidade,
-  altura = 260,
+  altura,
   comZoom = false,
 }: {
   dados: PontoSerie[]
@@ -29,8 +36,6 @@ export function SerieTemporal({
   altura?: number
   comZoom?: boolean
 }) {
-  // o memo abaixo lê as variáveis CSS do tema — ver useTema.ts
-  const tema = useTemaAtual()
 
   const option = useMemo(() => {
     const tk = lerTokens()
@@ -196,7 +201,7 @@ export function SerieTemporal({
           type: 'bar',
           yAxisIndex: 0,
           data: dados.map((d) => d.abertos),
-          itemStyle: { color: tk.series[0], borderRadius: MARCA.barraTopo4px },
+          itemStyle: { color: gradienteColuna(tk), borderRadius: MARCA.barraTopo4px },
           emphasis: { focus: 'series' as const },
         },
         {
@@ -249,7 +254,7 @@ export function SerieTemporal({
         },
       ],
     }
-  }, [dados, granularidade, comZoom, tema])
+  }, [dados, granularidade, comZoom])
 
   return <Chart option={option} altura={altura} aria-label="Protocolos criados por período, com o saldo entre entrada e saída" />
 }

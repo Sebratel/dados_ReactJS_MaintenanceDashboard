@@ -89,8 +89,7 @@ export function ExplicarIA({
         onClick={() => void perguntar()}
         disabled={carregando}
         title="Pede a um provedor de IA para ler esta tabela e resumir o que ela mostra"
-        className="flex items-center gap-1 rounded border px-2 py-1 text-[11px] text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-50"
-        style={{ borderColor: 'var(--border)' }}
+        className="btn-cab"
       >
         <IconeFaisca />
         {carregando ? 'lendo…' : 'Explicar'}
@@ -99,7 +98,14 @@ export function ExplicarIA({
       {aberto && (
         <div
           className="absolute inset-x-3 top-full z-30 mt-1 rounded-lg border p-3 shadow-lg"
-          style={{ borderColor: 'var(--border)', background: 'var(--surface-raised)' }}
+          style={{
+            borderColor: 'var(--border)',
+            background: 'var(--surface-raised)',
+            // o balão vive dentro da barra vinho, que pinta o texto de branco
+            color: 'var(--text-primary)',
+            textTransform: 'none',
+            fontWeight: 400,
+          }}
           role="status"
           aria-live="polite"
         >

@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { parsearFiltros } from '@/lib/filtros'
 import { useHistorico } from '@/lib/useIndicador'
 import { Painel } from '@/components/Painel'
+import { Segmentado } from '@/components/Segmentado'
 import { VolumeComCoeficiente } from '@/components/charts/VolumeComCoeficiente'
 import { RankingSimples } from '@/components/charts/RankingSimples'
 import { fmtFracaoPct, fmtInt, fmtMesCurto } from '@/lib/formato'
@@ -114,43 +115,23 @@ export function HistoricoConteudo() {
   ) : undefined
 
   const seletor = (
-    <div
-      className="flex overflow-hidden rounded border text-[11px]"
-      style={{ borderColor: 'var(--border)' }}
-      role="group"
-      aria-label="métrica do histórico"
-    >
-      {METRICAS.map((m) => (
-        <button
-          key={m.id}
-          type="button"
-          onClick={() => setMetrica(m.id)}
-          aria-pressed={metrica === m.id}
-          title={m.ajuda}
-          className={`px-2 py-1 transition-colors ${
-            metrica === m.id
-              ? 'bg-[var(--brand)] text-[var(--brand-ink)]'
-              : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-          }`}
-        >
-          {m.label}
-        </button>
-      ))}
-    </div>
+    <Segmentado
+      rotulo="métrica do histórico"
+      valor={metrica}
+      aoMudar={setMetrica}
+      opcoes={METRICAS.map((m) => ({ valor: m.id, rotulo: m.label, dica: m.ajuda }))}
+    />
   )
 
   return (
-    <div className="mx-auto flex max-w-[1600px] flex-col gap-4">
+    <div className="pagina">
       {/*
         ⚠️ ESTA TELA FALA DE MESES, E O FILTRO DE PERÍODO CONTINUA MANDANDO.
         Não há controle inerte aqui de propósito: um recorte de 7 dias devolve
         um mês só, o que é a resposta correta para a pergunta feita — e o aviso
         abaixo diz como obter a visão do BI em vez de deixar a pessoa adivinhar.
       */}
-      <p
-        className="rounded border px-3 py-2 text-xs leading-relaxed text-[var(--text-secondary)]"
-        style={{ borderColor: 'var(--border)', background: 'var(--surface-1)' }}
-      >
+      <p className="nota-tela" role="note">
         Série <strong>mensal</strong>, sempre pela data de abertura. O filtro de período vale
         normalmente — para a visão do ano inteiro que o Power BI mostra, escolha{' '}
         <strong>Ano corrente</strong>. Os demais filtros recortam numerador e denominador
@@ -159,6 +140,7 @@ export function HistoricoConteudo() {
 
       <Painel
         titulo={`${escolhida.label} sobre a base de clientes`}
+        classe="v-grafico"
         descricao={`${escolhida.ajuda} A linha é o volume do mês dividido pela base de clientes no último dia medido daquele mês.`}
         carregando={q.isLoading}
         erro={erro}
@@ -180,12 +162,13 @@ export function HistoricoConteudo() {
         }}
       >
         {pontos.length > 0 && (
-          <VolumeComCoeficiente dados={pontos} rotuloVolume={escolhida.label} altura={320} />
+          <VolumeComCoeficiente dados={pontos} rotuloVolume={escolhida.label} />
         )}
       </Painel>
 
       <Painel
         titulo={`${escolhida.label} por base`}
+        classe="v-tabela"
         descricao="Base real da agenda de campo — quem atendeu, não de que região é o cliente."
         carregando={q.isLoading}
         erro={erro}

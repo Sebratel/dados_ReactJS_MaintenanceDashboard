@@ -41,8 +41,19 @@ echarts.use([
 
 export type ChartProps = {
   option: echarts.EChartsCoreOption
-  /** altura em px; o gráfico rola no próprio container se precisar */
+  /**
+   * Altura fixa em px. SEM ELA o gráfico preenche o corpo do card, e quem
+   * decide a altura é o card (`classe` do Painel, calculada pela área útil da
+   * tela). Altura fixa fica para card `v-auto`, que não tem altura própria.
+   */
   altura?: number
+  /**
+   * Piso quando o gráfico preenche o card: abaixo disto ele não encolhe, e o
+   * corpo do card rola. É o caso dos rankings, cuja altura legível depende do
+   * número de barras — 30 técnicos não cabem em 250px, e espremer a barra a
+   * 3px seria pior que rolar.
+   */
+  alturaMinima?: number
   className?: string
   'aria-label'?: string
   /**
@@ -52,7 +63,14 @@ export type ChartProps = {
   aoClicar?: (dataIndex: number) => void
 }
 
-export function Chart({ option, altura = 280, className, aoClicar, ...rest }: ChartProps) {
+export function Chart({
+  option,
+  altura,
+  alturaMinima = 160,
+  className,
+  aoClicar,
+  ...rest
+}: ChartProps) {
   const ref = useRef<HTMLDivElement>(null)
   const inst = useRef<echarts.ECharts | null>(null)
 
@@ -77,26 +95,6 @@ export function Chart({ option, altura = 280, className, aoClicar, ...rest }: Ch
     const ro = new ResizeObserver(() => chart.resize())
     ro.observe(ref.current)
 
-    /*
-     * ⚠️ ISTO NÃO RECOLORE NADA — só redimensiona.
-     *
-     * O comentário antigo aqui dizia "recria a option", e o corpo chamava
-     * `resize()`. A promessa estava no comentário e não no código: trocar de
-     * tema deixava todo gráfico pintado com as cores do tema anterior até um
-     * refetch reconstruí-lo por outro motivo. Reportado em 19/10/2026 —
-     * gradeado preto sobre fundo branco num lado, linha invisível no outro.
-     *
-     * Quem recolore é `useTemaAtual()` (lib/useTema.ts), chamado por cada
-     * gráfico e declarado nas dependências do memo que monta a `option`. A
-     * dependência fica EXPLÍCITA onde ela existe, em vez de virar efeito
-     * colateral invisível aqui dentro.
-     *
-     * O observer continua porque a troca de tema pode mexer em fonte e
-     * espaçamento, e aí o canvas precisa remedir.
-     */
-    const mo = new MutationObserver(() => chart.resize())
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-
     chart.on('click', (p) => {
       const i = (p as { dataIndex?: number }).dataIndex
       if (typeof i === 'number') aoClicarRef.current?.(i)
@@ -104,7 +102,6 @@ export function Chart({ option, altura = 280, className, aoClicar, ...rest }: Ch
 
     return () => {
       ro.disconnect()
-      mo.disconnect()
       chart.dispose()
       inst.current = null
     }
@@ -120,7 +117,13 @@ export function Chart({ option, altura = 280, className, aoClicar, ...rest }: Ch
       ref={ref}
       role="img"
       className={className}
-      style={{ height: altura, width: '100%', cursor: aoClicar ? 'pointer' : undefined }}
+      style={{
+        ...(altura === undefined
+          ? { flex: '1 0 auto', height: 0, minHeight: alturaMinima }
+          : { height: altura, flex: 'none' }),
+        width: '100%',
+        cursor: aoClicar ? 'pointer' : undefined,
+      }}
       {...rest}
     />
   )

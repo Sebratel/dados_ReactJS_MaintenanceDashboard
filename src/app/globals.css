@@ -2,139 +2,97 @@
 
 /* ════════════════════════════════════════════════════════════════════
    DESIGN TOKENS — Dashboard Manutenção FTTX / Sebratel
-   Paleta validada com scripts/validate_palette.js (dataviz):
-     categórica 7 slots  → light e dark: TODOS OS CHECKS PASSAM
-       CVD pior par adjacente  ΔE 9.1 light / 8.4 dark  (alvo ≥ 8)
-       visão normal pior par   ΔE 19.6 light / 19.3 dark (piso ≥ 15)
-     rampa ordinal 30/60/90d → PASS nos dois modos
-   O vermelho da marca (#D80010) fica FORA da rotação de séries: é chrome.
-   Assim nenhuma série se confunde com marca nem com status crítico.
+   Skill padrao-frontend-dashboards: a paleta é HERDADA DA ORIGEM.
+
+   A origem é o `MAN - Relatório Manutenção FTTX.pbip`, e ela usa a mesma
+   paleta do COM · Gestão Comercial — contado nos visual.json em 22/10/2026:
+     #880F17 (vinho) ........ 233 ocorrências: barra de título, navegação
+     #D9B300 (dourado) ....... 44: série principal
+     #6B2328, #605E5C, #D49F00, #F0E199: o resto da família
+   O vermelho #D80010 que estava aqui partia da premissa de que "as origens são
+   diferentes"; o arquivo de origem mostra que não são.
+
+   Sem tema escuro: a casca Sebratel não tem, e nenhum outro dashboard tem.
+
+   Nada de hexadecimal fora deste bloco. Os gráficos leem os mesmos valores
+   pelo DOM (`lerTokens()` em lib/tema.ts), então a troca é num lugar só.
    ════════════════════════════════════════════════════════════════════ */
 
 :root {
   color-scheme: light;
 
-  /* superfícies e tinta */
-  --surface-1: #fcfcfb; /* superfície do gráfico/card */
-  --surface-page: #f9f9f7; /* plano da página */
-  --surface-raised: #ffffff;
-  --text-primary: #0b0b0b;
-  --text-secondary: #52514e;
-  --text-muted: #898781;
-  --gridline: #e1e0d9;
-  --axis: #c3c2b7;
-  --border: rgba(11, 11, 11, 0.1);
-  --border-strong: rgba(11, 11, 11, 0.18);
+  /* ── a paleta da marca ─────────────────────────────────────────── */
+  --pbi-primary: #880f17; /* barra de título dos visuais, navegação ativa */
+  --pbi-primary-dark: #6b2328; /* bordas de tabela, hover do primário */
+  --pbi-gold: #d9b300; /* série principal, topo do gradiente */
+  --pbi-gold-light: #f0e199; /* base do gradiente */
+  --pbi-gold-200: #eed790; /* fundo de aviso */
+  --pbi-gold-600: #d49f00; /* borda de aviso, atenção */
+  --pbi-orange: #e66c37; /* segunda série, linha sobre colunas */
+  --pbi-green: #0e9224; /* positivo */
+  --pbi-critico: #b3261e; /* crítico: reservado, nunca série */
+  --pbi-ink: #252423; /* texto principal, terceira série */
+  --pbi-ink-2: #3b3a39; /* texto corrido */
+  --pbi-muted: #605e5c; /* texto secundário, eixos */
+  --pbi-grid: #e1dfdd; /* grade, bordas de controle */
+  --pbi-borda: #e3e0dc; /* borda de card */
+  --pbi-fundo: #f3f2f1; /* plano da página */
+  --pbi-hover: #faf9f8; /* hover discreto */
+  --pbi-white: #ffffff;
+  --pbi-outros: #c8c6c4; /* "Outros (N)": não é categoria de verdade */
 
-  /* marca — SOMENTE chrome (branco sobre ela = 5,35:1; sobre superfície = 5,21:1) */
-  --brand: #d80010;
-  --brand-ink: #ffffff;
-  --brand-deep: #c00810;
+  /* ── layout: a altura dos cards sai da área que sobra ──────────── */
+  --h-topbar: 52px;
+  --h-nav: 36px;
+  --h-filtros: 50px;
+  --gap: 10px;
+  /* o "cromo" é tudo que não é conteúdo; 34px cobre paddings e bordas */
+  --chrome: calc(var(--h-topbar) + var(--h-nav) + var(--h-filtros) + 34px);
+  --util: calc(100vh - var(--chrome));
+  --font: 'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif;
+  --card-radius: 8px;
+  --card-shadow: 0 1px 2px rgba(37, 36, 35, 0.06), 0 6px 16px -10px rgba(37, 36, 35, 0.35);
 
-  /* categórica: 7 slots, ordem fixa, NUNCA ciclada */
-  --series-1: #2a78d6; /* azul */
-  --series-2: #eb6834; /* laranja */
-  --series-3: #1baf7a; /* aqua */
-  --series-4: #eda100; /* amarelo */
-  --series-5: #e87ba4; /* magenta */
-  --series-6: #008300; /* verde */
-  --series-7: #4a3aa7; /* violeta */
+  /* ── os papéis que os componentes leem, apontando para a paleta ── */
+  --surface-1: var(--pbi-white); /* card e gráfico */
+  --surface-page: var(--pbi-fundo);
+  --surface-raised: var(--pbi-white);
+  --text-primary: var(--pbi-ink);
+  --text-secondary: var(--pbi-ink-2);
+  --text-muted: var(--pbi-muted);
+  --gridline: var(--pbi-grid);
+  --axis: var(--pbi-outros);
+  --border: var(--pbi-borda);
+  --border-strong: var(--pbi-outros);
+  --brand: var(--pbi-primary);
+  --brand-ink: var(--pbi-white);
+  --brand-deep: var(--pbi-primary-dark);
 
-  /* status — reservado, sempre com ícone + rótulo, nunca como série */
-  --status-good: #0ca30c;
-  --status-warning: #fab219;
-  --status-serious: #ec835a;
-  --status-critical: #d03b3b;
-  --delta-up-good: #006300;
+  /* identidade das séries: ordem FIXA, nunca pela posição no ranking */
+  --series-1: var(--pbi-gold);
+  --series-2: var(--pbi-orange);
+  --series-3: var(--pbi-ink);
 
-  /* sequencial (magnitude) — um hue, 100→700 */
-  --seq-100: #cde2fb;
-  --seq-200: #9ec5f4;
-  --seq-300: #6da7ec;
-  --seq-400: #3987e5;
-  --seq-500: #256abf;
-  --seq-600: #184f95;
-  --seq-700: #0d366b;
+  /* estado — reservado, sempre com ícone ou rótulo, nunca como série */
+  --status-good: var(--pbi-green);
+  --status-warning: var(--pbi-gold-600);
+  --status-serious: var(--pbi-orange);
+  --status-critical: var(--pbi-critico);
+  --delta-up-good: var(--pbi-green);
 
-  /* ordinal 30/60/90 dias (janelas ordenadas → rampa de um hue) */
-  --ord-1: #86b6ef;
-  --ord-2: #2a78d6;
-  --ord-3: #184f95;
+  /* magnitude (heatmap, barra de dados): um tom só, claro → escuro */
+  --seq-100: #fbf6de;
+  --seq-200: #f6ecba;
+  --seq-300: var(--pbi-gold-light);
+  --seq-400: #e8d166;
+  --seq-500: #e0c233;
+  --seq-600: var(--pbi-gold);
+  --seq-700: #9a7f00;
 
-  /* divergente (polaridade vs meta) — azul ↔ vermelho, cinza no meio */
-  --div-neg: #2a78d6;
-  --div-mid: #f0efec;
-  --div-pos: #d03b3b;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:where(:not([data-theme='light'])) {
-    color-scheme: dark;
-    --surface-1: #1a1a19;
-    --surface-page: #0d0d0d;
-    --surface-raised: #222221;
-    --text-primary: #ffffff;
-    --text-secondary: #c3c2b7;
-    --text-muted: #898781;
-    --gridline: #2c2c2a;
-    --axis: #383835;
-    --border: rgba(255, 255, 255, 0.1);
-    --border-strong: rgba(255, 255, 255, 0.18);
-
-    --brand: #e84a52; /* clareado para 4,59:1 na superfície escura */
-    --brand-ink: #ffffff;
-    --brand-deep: #d80010;
-
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-    --series-4: #c98500;
-    --series-5: #d55181;
-    --series-6: #008300;
-    --series-7: #9085e9;
-
-    --delta-up-good: #0ca30c;
-
-    --ord-1: #cde2fb;
-    --ord-2: #3987e5;
-    --ord-3: #184f95;
-
-    --div-mid: #383835;
-  }
-}
-
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --surface-1: #1a1a19;
-  --surface-page: #0d0d0d;
-  --surface-raised: #222221;
-  --text-primary: #ffffff;
-  --text-secondary: #c3c2b7;
-  --text-muted: #898781;
-  --gridline: #2c2c2a;
-  --axis: #383835;
-  --border: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(255, 255, 255, 0.18);
-
-  --brand: #e84a52;
-  --brand-ink: #ffffff;
-  --brand-deep: #d80010;
-
-  --series-1: #3987e5;
-  --series-2: #d95926;
-  --series-3: #199e70;
-  --series-4: #c98500;
-  --series-5: #d55181;
-  --series-6: #008300;
-  --series-7: #9085e9;
-
-  --delta-up-good: #0ca30c;
-
-  --ord-1: #cde2fb;
-  --ord-2: #3987e5;
-  --ord-3: #184f95;
-
-  --div-mid: #383835;
+  /* ordinal 30/60/90 dias: janelas ordenadas, mesma rampa */
+  --ord-1: var(--pbi-gold-light);
+  --ord-2: var(--pbi-gold);
+  --ord-3: #9a7f00;
 }
 
 /* expõe os tokens ao Tailwind v4 */
@@ -154,19 +112,20 @@
   --color-warning: var(--status-warning);
   --color-serious: var(--status-serious);
   --color-critical: var(--status-critical);
-  --font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans: var(--font);
 }
 
 html,
 body {
   background: var(--surface-page);
   color: var(--text-primary);
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--font);
   -webkit-font-smoothing: antialiased;
 }
 
-/* o body nunca rola na horizontal — conteúdo largo rola no próprio container */
 body {
+  font-size: 13px;
+  /* o body nunca rola na horizontal — conteúdo largo rola no próprio container */
   overflow-x: hidden;
 }
 

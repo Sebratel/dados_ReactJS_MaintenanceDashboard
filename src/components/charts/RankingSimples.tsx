@@ -11,8 +11,7 @@ import {
   baseTooltip,
 } from '@/lib/tema'
 
-import { useTemaAtual } from '@/lib/useTema'
-import { fmtFracaoPct, fmtInt } from '@/lib/formato'
+import { fmtFracaoPct, fmtInt, semEmoji } from '@/lib/formato'
 
 export type ItemSimples = {
   rotulo: string
@@ -83,8 +82,6 @@ export function RankingSimples({
   // fora do useMemo: o handler de clique precisa da MESMA ordem que as barras
   const ordenado = useMemo(() => [...dados].reverse(), [dados])
 
-  // o memo abaixo lê as variáveis CSS do tema — ver useTema.ts
-  const tema = useTemaAtual()
 
   const option = useMemo(() => {
     const tk = lerTokens()
@@ -115,7 +112,7 @@ export function RankingSimples({
         formatter: (p: { dataIndex: number }) => {
           const d = ordenado[p.dataIndex]
           if (!d) return ''
-          return `<b>${d.rotulo}</b><br/>
+          return `<b>${semEmoji(d.rotulo)}</b><br/>
             ${formatarValor(d.valor)} ${unidade}${
               d.share !== undefined ? ` (${fmtFracaoPct(d.share, 1)} do total)` : ''
             }${d.detalhe ? `<br/><span style="color:${tk.textMuted}">${d.detalhe}</span>` : ''}`
@@ -127,7 +124,7 @@ export function RankingSimples({
         axisLabel: { color: tk.textMuted, fontSize: 11, formatter: (v: number) => formatarValor(v) },
       }),
       yAxis: baseEixoCategoria(tk, {
-        data: ordenado.map((d) => d.rotulo),
+        data: ordenado.map((d) => semEmoji(d.rotulo)),
         axisLine: { show: false },
         axisLabel: {
           color: tk.textSecondary,
@@ -178,13 +175,15 @@ export function RankingSimples({
         },
       ],
     }
-  }, [dados, ordenado, unidade, escala, selecionado, formatarValor, tema])
+  }, [dados, ordenado, unidade, escala, selecionado, formatarValor])
 
-  const h = altura ?? Math.max(140, dados.length * 26 + 24)
+  // sem altura fixa preenche o card; ~18px por barra é o piso legível
+  const minima = Math.max(120, dados.length * 18 + 24)
   return (
     <Chart
       option={option}
-      altura={h}
+      altura={altura}
+      alturaMinima={minima}
       aria-label="Ranking por volume"
       aoClicar={
         aoClicar ? (i) => {

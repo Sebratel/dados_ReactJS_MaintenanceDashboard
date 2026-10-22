@@ -3,8 +3,7 @@
 import { useMemo } from 'react'
 import { Chart } from './Chart'
 import { lerTokens, MARCA, baseEixoCategoria, baseEixoValor, baseGrid, baseTooltip } from '@/lib/tema'
-import { useTemaAtual } from '@/lib/useTema'
-import { fmtFracaoPct, fmtHoras, fmtInt } from '@/lib/formato'
+import { fmtFracaoPct, fmtHoras, fmtInt, semEmoji } from '@/lib/formato'
 import type { ItemRanking } from '@/server/indicadores/ranking'
 
 /**
@@ -34,8 +33,6 @@ export function RankingBarras({
   onSelecionar?: (rotulo: string) => void
   escala?: 'nominal' | 'ordinal'
 }) {
-  // o memo abaixo lê as variáveis CSS do tema — ver useTema.ts
-  const tema = useTemaAtual()
 
   const option = useMemo(() => {
     const tk = lerTokens()
@@ -59,7 +56,7 @@ export function RankingBarras({
         formatter: (p: { dataIndex: number }) => {
           const d = ordenado[p.dataIndex]
           if (!d) return ''
-          return `<b>${d.rotulo}</b><br/>
+          return `<b>${semEmoji(d.rotulo)}</b><br/>
             Protocolos <b>${fmtInt(d.protocolos)}</b> (${fmtFracaoPct(d.share, 1)} do total)<br/>
             Encerrados <b>${fmtInt(d.encerrados)}</b><br/>
             MTTR médio <b>${fmtHoras(d.mttrHoras)}</b>`
@@ -67,7 +64,7 @@ export function RankingBarras({
       }),
       xAxis: baseEixoValor(tk, { splitLine: { show: false } }),
       yAxis: baseEixoCategoria(tk, {
-        data: ordenado.map((d) => d.rotulo),
+        data: ordenado.map((d) => semEmoji(d.rotulo)),
         axisLine: { show: false },
         axisLabel: {
           color: tk.textSecondary,
@@ -108,8 +105,16 @@ export function RankingBarras({
         },
       ],
     }
-  }, [dados, onSelecionar, escala, tema])
+  }, [dados, onSelecionar, escala])
 
-  const h = altura ?? Math.max(160, dados.length * 26 + 24)
-  return <Chart option={option} altura={h} aria-label="Ranking de protocolos por dimensão" />
+  // sem altura fixa preenche o card; abaixo de ~18px por barra o rótulo
+  // deixa de caber, e aí o corpo do card rola em vez de espremer
+  return (
+    <Chart
+      option={option}
+      altura={altura}
+      alturaMinima={Math.max(140, dados.length * 18 + 24)}
+      aria-label="Ranking de protocolos por dimensão"
+    />
+  )
 }

@@ -27,9 +27,10 @@ export function OperacaoConteudo() {
   const principal = useRanking(filtros, dimPrincipal, 15)
 
   return (
-    <div className="mx-auto flex max-w-[1600px] flex-col gap-4">
+    <div className="pagina">
       <Painel
         titulo="Entrantes e saldo do backlog"
+        classe="v-grafico"
         descricao={`Barra = entrantes. Linha = saldo (entra − sai): acima da tracejada o backlog cresceu. Encerrados fica no tooltip e na aba Tabela. Eixo da data: ${filtros.eixo}`}
         carregando={serie.isLoading}
         erro={serie.error ? String(serie.error.message) : null}
@@ -53,7 +54,6 @@ export function OperacaoConteudo() {
           <SerieTemporal
             dados={serie.data.data}
             granularidade={filtros.granularidade}
-            altura={230}
             comZoom={serie.data.data.length > 45}
           />
         )}
@@ -62,6 +62,7 @@ export function OperacaoConteudo() {
       {/* dimensão principal, trocável — substitui os "REPAROS ABERTOS - VISÃO X" */}
       <Painel
         titulo={`Distribuição por ${DIMENSOES[dimPrincipal].label.toLowerCase()}`}
+        classe="v-tabela"
         descricao={principal.data ? `Total ${fmtInt(principal.data.meta.total)} protocolos` : undefined}
         carregando={principal.isLoading}
         erro={principal.error ? String(principal.error.message) : null}
@@ -70,8 +71,7 @@ export function OperacaoConteudo() {
             value={dimPrincipal}
             onChange={(e) => setDimPrincipal(e.target.value as Dimensao)}
             aria-label="Dimensão de agrupamento"
-            className="rounded border bg-[var(--surface-1)] px-1.5 py-1 text-[11px] text-[var(--text-primary)]"
-            style={{ borderColor: 'var(--border)' }}
+            className="sel-cab"
           >
             {(Object.keys(DIMENSOES) as Dimensao[]).map((d) => (
               <option key={d} value={d}>
@@ -100,7 +100,7 @@ export function OperacaoConteudo() {
         {principal.data && <RankingBarras dados={principal.data.data} />}
       </Painel>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))' }}>
+      <div className="faixa tres">
         {BLOCOS.map((b) => (
           <BlocoRanking key={b.dim} {...b} filtros={filtros} />
         ))}
@@ -126,6 +126,7 @@ function BlocoRanking({
   return (
     <Painel
       titulo={titulo}
+      classe="v-meia"
       descricao={descricao}
       carregando={q.isLoading}
       erro={q.error ? String(q.error.message) : null}

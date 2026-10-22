@@ -4,10 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { buscarJson } from '@/lib/clienteHttp'
 import type { IdTela, Papel, Tela } from '@/config/telas'
+import { Icone, type NomeIcone } from '@/components/Icone'
 import { AbaIA } from './AbaIA'
 
 /**
- * Configurações — quem entra e o que cada um vê.
+ * Configurações — quem entra e o que cada um vê. Formato da casca Sebratel:
+ * um card "Configurações" com quem está editando no subtítulo, abas com ícone
+ * e as duas abas obrigatórias (Usuários e papéis, Acesso por tela).
  *
  * PADRÃO DE GRAVAÇÃO: rascunho + Salvar, nunca gravação por clique.
  *
@@ -17,6 +20,9 @@ import { AbaIA } from './AbaIA'
  * acesso por dois segundos, alguém com acesso a mais — é real e observável por
  * quem estiver usando o dashboard naquele instante. Com rascunho, o intervalo
  * inconsistente não existe: ou a mudança inteira valeu, ou nada valeu.
+ *
+ * ⚠️ AINDA GRAVA EM ARQUIVO NO VOLUME (`data/acesso.json`), não no banco que a
+ * casca pede. Mudar isso é decisão de servidor, fora desta reforma de tela.
  */
 
 type UsuarioConfig = { email: string; papel: Papel; nome: string | null; fixo: boolean }
@@ -31,9 +37,19 @@ type Estado = {
 
 type Rascunho = { usuarios: UsuarioConfig[]; telas: MatrizTela[]; removidos: string[] }
 
-export function Conteudo() {
+type Aba = 'usuarios' | 'telas' | 'ia'
+
+const ABAS: { id: Aba; rotulo: string; icone: NomeIcone }[] = [
+  { id: 'usuarios', rotulo: 'Usuários e papéis', icone: 'pessoas' },
+  { id: 'telas', rotulo: 'Acesso por tela', icone: 'tela' },
+  { id: 'ia', rotulo: 'Provedor de IA', icone: 'ia' },
+]
+
+const PAPEL_LABEL: Record<Papel, string> = { viewer: 'Visualizador', admin: 'Administrador' }
+
+export function Conteudo({ email }: { email: string }) {
   const qc = useQueryClient()
-  const [aba, setAba] = useState<'usuarios' | 'telas' | 'ia'>('usuarios')
+  const [aba, setAba] = useState<Aba>('usuarios')
   const [rascunho, setRascunho] = useState<Rascunho | null>(null)
   const [erroSalvar, setErroSalvar] = useState<string | null>(null)
 
@@ -89,14 +105,8 @@ export function Conteudo() {
     setErroSalvar(null)
   }, [data])
 
-  if (isLoading) return <Estado3 tipo="carregando" />
-  if (error) {
-    return <Estado3 tipo="erro" mensagem={error instanceof Error ? error.message : String(error)} />
-  }
-  if (!data || !rascunho) return <Estado3 tipo="vazio" />
-
   /**
-   * Depois do guard acima o rascunho nunca é nulo, mas o setter do `useState`
+   * Depois do guard abaixo o rascunho nunca é nulo, mas o setter do `useState`
    * continua tipado como `Rascunho | null`. Este embrulho passa às abas um
    * setter que só sabe de rascunho existente — em vez de espalhar `?? r` por
    * dentro de cada `setRascunho`, onde o `null` voltaria a ser possível.
@@ -104,59 +114,77 @@ export function Conteudo() {
   const editar = (f: (r: Rascunho) => Rascunho) => setRascunho((r) => (r ? f(r) : r))
 
   return (
-    <div className="mx-auto max-w-[1100px] pb-24">
-      <header className="mb-4">
-        <h1 className="text-[15px] font-semibold text-[var(--text-primary)]">Configurações</h1>
-        <p className="mt-1 text-xs text-[var(--text-muted)]">
-          Quem entra no dashboard e o que cada pessoa enxerga.
-        </p>
-      </header>
+    <div className="pagina">
+      <section className="visual v-auto" aria-label="Configurações">
+        <div className="visual-cab">
+          <h2>Configurações</h2>
+        </div>
+        <div className="visual-sub">
+          {email} · {PAPEL_LABEL.admin} — quem entra no dashboard e o que cada pessoa enxerga.
+        </div>
 
-      {!data.controleAtivo && <AvisoControleInativo />}
+        <div className="visual-corpo" style={{ padding: '10px 12px 14px' }}>
+          {isLoading ? (
+            <div className="estado" role="status" aria-label="Carregando">
+              <div className="carregando-barra" />
+            </div>
+          ) : error ? (
+            <div className="estado erro" role="alert">
+              <span className="linha">
+                <Icone nome="alerta" tamanho={14} />
+                {error instanceof Error ? error.message : String(error)}
+              </span>
+            </div>
+          ) : !data || !rascunho ? (
+            <div className="estado">Sem configuração para mostrar.</div>
+          ) : (
+            <>
+              {!data.controleAtivo && <AvisoControleInativo />}
 
-      <div className="mb-4 flex gap-1 border-b" style={{ borderColor: 'var(--border)' }}>
-        {(
-          [
-            ['usuarios', 'Usuários'],
-            ['telas', 'Telas'],
-            ['ia', 'IA'],
-          ] as const
-        ).map(([id, rotulo]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setAba(id)}
-            className="relative px-3 py-2 text-xs font-medium transition-colors"
-            style={{ color: aba === id ? 'var(--text-primary)' : 'var(--text-muted)' }}
-          >
-            {rotulo}
-            {aba === id && (
-              <span
-                aria-hidden="true"
-                className="absolute inset-x-2 -bottom-px h-0.5 rounded-full"
-                style={{ background: 'var(--brand)' }}
-              />
-            )}
-          </button>
-        ))}
-      </div>
+              <div className="cfg-abas" role="tablist">
+                {ABAS.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={aba === a.id}
+                    className={aba === a.id ? 'on' : ''}
+                    onClick={() => setAba(a.id)}
+                  >
+                    <Icone nome={a.icone} tamanho={14} /> {a.rotulo}
+                  </button>
+                ))}
+              </div>
 
-      {aba === 'usuarios' && <AbaUsuarios rascunho={rascunho} setRascunho={editar} />}
-      {aba === 'telas' && (
-        <AbaTelas rascunho={rascunho} setRascunho={editar} catalogo={data.catalogo} />
-      )}
-      {/* A aba de IA grava sozinha — ela lida com credencial, e credencial nao
-          fica pendurada num rascunho que alguem pode descartar sem querer. Por
-          isso ela nao participa da barra de Salvar abaixo. */}
-      {aba === 'ia' && <AbaIA />}
+              {/* A aba de IA grava sozinha — ela lida com credencial, e
+                  credencial não fica pendurada num rascunho que alguém pode
+                  descartar sem querer. Por isso ela não tem a barra de Salvar. */}
+              {aba !== 'ia' && (
+                <BarraRascunho
+                  pendentes={pendentes}
+                  salvando={salvar.isPending}
+                  erro={erroSalvar}
+                  onDescartar={descartar}
+                  onSalvar={() => salvar.mutate(rascunho)}
+                />
+              )}
 
-      <BarraSalvar
-        pendentes={pendentes}
-        salvando={salvar.isPending}
-        erro={erroSalvar}
-        onDescartar={descartar}
-        onSalvar={() => salvar.mutate(rascunho)}
-      />
+              {aba === 'usuarios' && (
+                <AbaUsuarios rascunho={rascunho} original={data} setRascunho={editar} />
+              )}
+              {aba === 'telas' && (
+                <AbaTelas
+                  rascunho={rascunho}
+                  original={data}
+                  setRascunho={editar}
+                  catalogo={data.catalogo}
+                />
+              )}
+              {aba === 'ia' && <AbaIA />}
+            </>
+          )}
+        </div>
+      </section>
     </div>
   )
 }
@@ -165,12 +193,15 @@ export function Conteudo() {
 
 function AbaUsuarios({
   rascunho,
+  original,
   setRascunho,
 }: {
   rascunho: Rascunho
+  original: Estado
   setRascunho: (f: (r: Rascunho) => Rascunho) => void
 }) {
   const [novo, setNovo] = useState('')
+  const [novoPapel, setNovoPapel] = useState<Papel>('viewer')
   const [erro, setErro] = useState<string | null>(null)
 
   const visiveis = rascunho.usuarios.filter((u) => !rascunho.removidos.includes(u.email))
@@ -192,288 +223,279 @@ function AbaUsuarios({
     setRascunho((r) => ({
       ...r,
       removidos: r.removidos.filter((e) => e !== email),
-      usuarios: [
-        ...r.usuarios,
-        { email, papel: 'viewer' as const, nome: null, fixo: false },
-      ].sort((a, b) =>
+      usuarios: [...r.usuarios, { email, papel: novoPapel, nome: null, fixo: false }].sort((a, b) =>
         a.email.localeCompare(b.email)
       ),
     }))
   }
 
   return (
-    <section>
-      <p className="mb-3 text-xs leading-relaxed text-[var(--text-secondary)]">
-        <strong>Quem não está nesta lista também entra</strong> — basta ter conta{' '}
-        <code className="text-[11px]">@sebratel.com.br</code> — e entra como{' '}
-        <em>viewer</em>. A lista serve para <strong>promover a administrador</strong> e para
-        ter um nome a usar na aba Telas.
+    <div className="cfg-bloco">
+      <p className="cfg-nota">
+        <b>Quem não está nesta lista também entra</b> — basta ter conta{' '}
+        <code>@sebratel.com.br</code> — e entra como <b>Visualizador</b>. A lista serve para{' '}
+        <b>promover a Administrador</b> e para ter um nome a marcar em <b>Acesso por tela</b>.
+        Administrador vê todas as telas e abre esta página.
       </p>
 
-      <div className="mb-3 flex gap-2">
-        <input
-          value={novo}
-          onChange={(e) => setNovo(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && adicionar()}
-          placeholder="pessoa@sebratel.com.br"
-          className="w-72 rounded border px-2.5 py-1.5 text-xs"
-          style={{
-            borderColor: 'var(--border)',
-            background: 'var(--surface-1)',
-            color: 'var(--text-primary)',
-          }}
-        />
-        <button
-          type="button"
-          onClick={adicionar}
-          className="rounded border px-3 py-1.5 text-xs font-medium transition-colors hover:border-[var(--border-strong)]"
-          style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-        >
-          Adicionar
+      <div className="cfg-form">
+        <label>
+          <span>E-mail corporativo</span>
+          <input
+            type="email"
+            value={novo}
+            onChange={(e) => setNovo(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && adicionar()}
+            placeholder="pessoa@sebratel.com.br"
+          />
+        </label>
+        <label>
+          <span>Papel</span>
+          <select value={novoPapel} onChange={(e) => setNovoPapel(e.target.value as Papel)}>
+            <option value="viewer">{PAPEL_LABEL.viewer}</option>
+            <option value="admin">{PAPEL_LABEL.admin}</option>
+          </select>
+        </label>
+        <button type="button" className="cfg-botao" onClick={adicionar} disabled={!novo.trim()}>
+          <Icone nome="mais" tamanho={14} /> Adicionar
         </button>
       </div>
 
       {erro && (
-        <p className="mb-3 text-xs" style={{ color: 'var(--status-critical)' }}>
-          {erro}
-        </p>
+        <div className="banner error" role="alert">
+          <Icone nome="alerta" tamanho={14} /> {erro}
+        </div>
       )}
 
       {visiveis.length === 0 ? (
-        <Vazio texto="Ninguém cadastrado. Todo mundo do domínio entra como viewer." />
+        <div className="estado">Ninguém cadastrado. Todo mundo do domínio entra como Visualizador.</div>
       ) : (
-        <div
-          className="overflow-hidden rounded-lg border"
-          style={{ borderColor: 'var(--border)' }}
-        >
-          <table className="w-full text-xs">
+        <div className="tabela-caixa" style={{ maxHeight: 460 }}>
+          <table className="tabela">
             <thead>
-              <tr style={{ background: 'var(--surface-page)' }}>
-                <Th>Pessoa</Th>
-                <Th>Papel</Th>
-                <Th alinhar="dir">Ações</Th>
+              <tr>
+                <th className="texto">E-mail</th>
+                <th className="texto">Papel</th>
+                <th className="centro">Remover</th>
               </tr>
             </thead>
             <tbody>
-              {visiveis.map((u) => (
-                <tr key={u.email} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                  <td className="px-3 py-2">
-                    <span className="text-[var(--text-primary)]">{u.email}</span>
-                    {u.fixo && (
-                      <span
-                        className="ml-2 rounded px-1.5 py-px text-[9px] font-bold tracking-wide uppercase"
-                        style={{
-                          background: 'var(--surface-page)',
-                          color: 'var(--text-muted)',
-                        }}
-                        title="Administrador definido em ADMIN_EMAILS, no ambiente. A tela não pode rebaixá-lo — é a porta de emergência contra ficar sem admin."
+              {visiveis.map((u) => {
+                const antes = original.usuarios.find((x) => x.email === u.email)
+                const pendente = !antes || antes.papel !== u.papel
+                const unicoAdmin = u.papel === 'admin' && admins === 1
+                return (
+                  <tr key={u.email}>
+                    <td className="texto">
+                      {u.email}
+                      {!antes && <span className="cfg-tag">novo</span>}
+                    </td>
+                    <td className={`texto${pendente ? ' pendente' : ''}`}>
+                      {u.fixo ? (
+                        <>
+                          {PAPEL_LABEL[u.papel]}{' '}
+                          <span
+                            className="cfg-tag fixo"
+                            title="Administrador definido em ADMIN_EMAILS, no ambiente. A tela não pode rebaixá-lo — é a porta de emergência contra ficar sem admin."
+                          >
+                            <Icone nome="cadeado" tamanho={11} /> fixo
+                          </span>
+                        </>
+                      ) : (
+                        <select
+                          className="cfg-select-inline"
+                          value={u.papel}
+                          onChange={(e) =>
+                            setRascunho((r) => ({
+                              ...r,
+                              usuarios: r.usuarios.map((x) =>
+                                x.email === u.email ? { ...x, papel: e.target.value as Papel } : x
+                              ),
+                            }))
+                          }
+                        >
+                          <option value="viewer">{PAPEL_LABEL.viewer}</option>
+                          <option value="admin">{PAPEL_LABEL.admin}</option>
+                        </select>
+                      )}
+                    </td>
+                    <td className="centro">
+                      <button
+                        type="button"
+                        className="cfg-remover"
+                        style={{ margin: '0 auto' }}
+                        disabled={u.fixo || unicoAdmin}
+                        onClick={() =>
+                          setRascunho((r) => ({ ...r, removidos: [...r.removidos, u.email] }))
+                        }
+                        title={
+                          u.fixo
+                            ? 'Definido no ambiente (ADMIN_EMAILS); só muda por lá.'
+                            : unicoAdmin
+                              ? 'É o único administrador — promova outra pessoa antes.'
+                              : 'Remover da lista'
+                        }
+                        aria-label={`Remover ${u.email}`}
                       >
-                        fixo
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <select
-                      value={u.papel}
-                      disabled={u.fixo}
-                      onChange={(e) =>
-                        setRascunho((r) => ({
-                          ...r,
-                          usuarios: r.usuarios.map((x) =>
-                            x.email === u.email ? { ...x, papel: e.target.value as Papel } : x
-                          ),
-                        }))
-                      }
-                      className="rounded border px-2 py-1 text-xs disabled:opacity-60"
-                      style={{
-                        borderColor: 'var(--border)',
-                        background: 'var(--surface-1)',
-                        color: 'var(--text-primary)',
-                      }}
-                      title={
-                        u.fixo
-                          ? 'Definido no ambiente (ADMIN_EMAILS); não pode ser alterado por aqui.'
-                          : undefined
-                      }
-                    >
-                      <option value="viewer">viewer</option>
-                      <option value="admin">admin</option>
-                    </select>
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <button
-                      type="button"
-                      disabled={u.fixo || (u.papel === 'admin' && admins === 1)}
-                      onClick={() =>
-                        setRascunho((r) => ({ ...r, removidos: [...r.removidos, u.email] }))
-                      }
-                      className="rounded px-2 py-1 text-xs transition-colors hover:bg-[var(--surface-page)] disabled:cursor-not-allowed disabled:opacity-40"
-                      style={{ color: 'var(--status-critical)' }}
-                      title={
-                        u.fixo
-                          ? 'Definido no ambiente.'
-                          : u.papel === 'admin' && admins === 1
-                            ? 'É o único administrador — promova outra pessoa antes.'
-                            : 'Remover da lista'
-                      }
-                    >
-                      Remover
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                        <Icone nome="fechar" tamanho={13} />
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
       )}
-    </section>
+    </div>
   )
 }
 
-/* ──────────────────────────────── Telas ───────────────────────────────── */
+/* ──────────────────────────── Acesso por tela ─────────────────────────── */
 
+/**
+ * A matriz pessoa × tela da casca, sobre o modelo que já existia: cada tela é
+ * `todos` (qualquer pessoa do domínio) ou `lista` (só as marcadas).
+ *
+ * A primeira linha, "Todos do domínio", é o modo da tela. Enquanto ela está
+ * marcada, as caixas da coluna aparecem marcadas e TRAVADAS — porque é isso que
+ * acontece de fato: todo mundo vê. Caixa clicável que não muda nada engana
+ * quem clica (skill, seção 7). O mesmo vale para administrador, que vê tudo
+ * pelo papel.
+ */
 function AbaTelas({
   rascunho,
+  original,
   setRascunho,
   catalogo,
 }: {
   rascunho: Rascunho
+  original: Estado
   setRascunho: (f: (r: Rascunho) => Rascunho) => void
   catalogo: readonly Tela[]
 }) {
-  const pessoas = rascunho.usuarios
-    .filter((u) => !rascunho.removidos.includes(u.email))
-    .map((u) => u.email)
-
+  const pessoas = rascunho.usuarios.filter((u) => !rascunho.removidos.includes(u.email))
   const porId = new Map(catalogo.map((t) => [t.id, t]))
 
+  const alterarTela = (tela: IdTela, f: (t: MatrizTela) => MatrizTela) =>
+    setRascunho((r) => ({ ...r, telas: r.telas.map((x) => (x.tela === tela ? f(x) : x)) }))
+
+  /** O que a pessoa via ANTES desta edição, nesta tela — para marcar o pendente. */
+  const viaAntes = (tela: IdTela, email: string) => {
+    const t = original.telas.find((x) => x.tela === tela)
+    return t?.modo === 'lista' && t.emails.includes(email)
+  }
+
   return (
-    <section>
-      <p className="mb-3 text-xs leading-relaxed text-[var(--text-secondary)]">
-        <strong>Todos</strong> libera a tela para qualquer pessoa do domínio.{' '}
-        <strong>Lista</strong> restringe às marcadas. Administradores veem tudo, sempre —
-        quem edita a matriz precisa poder conferir o resultado da própria edição.
+    <div className="cfg-bloco">
+      <p className="cfg-nota">
+        <b>Todos do domínio</b> libera a tela para qualquer pessoa com conta{' '}
+        <code>@sebratel.com.br</code>. Desmarque para escolher quem vê, pessoa a pessoa.
+        Administradores veem tudo, sempre — quem edita a matriz precisa poder conferir o
+        resultado da própria edição. A Capa é de todos e não aparece aqui.
       </p>
 
       {pessoas.length === 0 && (
-        <p
-          className="mb-3 rounded border px-3 py-2 text-xs leading-relaxed"
-          style={{
-            borderColor: 'var(--status-warning)',
-            background: 'color-mix(in srgb, var(--status-warning) 12%, transparent)',
-            color: 'var(--text-primary)',
-          }}
-        >
-          Nenhuma pessoa cadastrada na aba Usuários. Para restringir uma tela a pessoas
+        <div className="banner">
+          Nenhuma pessoa cadastrada em Usuários e papéis. Para restringir uma tela a pessoas
           específicas, adicione-as lá primeiro.
-        </p>
+        </div>
       )}
 
-      <div className="grid gap-2">
-        {rascunho.telas.map((t) => {
-          const info = porId.get(t.tela)
-          return (
-            <article
-              key={t.tela}
-              className="rounded-lg border p-3"
-              style={{ borderColor: 'var(--border)', background: 'var(--surface-1)' }}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">
-                    {info?.rotulo ?? t.tela}
-                  </h3>
-                  <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">{info?.contem}</p>
-                </div>
-
-                <div className="flex shrink-0 gap-1">
-                  {(['todos', 'lista'] as const).map((modo) => (
-                    <button
-                      key={modo}
-                      type="button"
-                      onClick={() =>
-                        setRascunho((r) => ({
-                          ...r,
-                          telas: r.telas.map((x) => (x.tela === t.tela ? { ...x, modo } : x)),
-                        }))
+      <div className="tabela-caixa" style={{ maxHeight: 520 }}>
+        <table className="tabela matriz">
+          <thead>
+            <tr>
+              <th className="texto col-nome">Pessoa</th>
+              {rascunho.telas.map((t) => (
+                <th key={t.tela} className="centro" title={porId.get(t.tela)?.contem}>
+                  {porId.get(t.tela)?.rotulo ?? t.tela}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="linha-todos">
+              <td className="texto col-nome" title="Liberar a tela para qualquer pessoa do domínio">
+                Todos do domínio
+              </td>
+              {rascunho.telas.map((t) => {
+                const antes = original.telas.find((x) => x.tela === t.tela)?.modo
+                return (
+                  <td
+                    key={t.tela}
+                    className={`centro${antes !== t.modo ? ' pendente' : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={t.modo === 'todos'}
+                      onChange={(e) =>
+                        alterarTela(t.tela, (x) => ({ ...x, modo: e.target.checked ? 'todos' : 'lista' }))
                       }
-                      className="rounded border px-2.5 py-1 text-[11px] font-medium transition-colors"
-                      style={
-                        t.modo === modo
-                          ? {
-                              borderColor: 'var(--brand)',
-                              background: 'color-mix(in srgb, var(--brand) 12%, transparent)',
-                              color: 'var(--text-primary)',
-                            }
-                          : { borderColor: 'var(--border)', color: 'var(--text-muted)' }
+                      aria-label={`${porId.get(t.tela)?.rotulo ?? t.tela} para todos do domínio`}
+                    />
+                  </td>
+                )
+              })}
+            </tr>
+
+            {pessoas.map((u) => (
+              <tr key={u.email}>
+                <td className="texto col-nome" title={u.email}>
+                  {u.email}
+                  {u.papel === 'admin' && <span className="cfg-tag">admin</span>}
+                </td>
+                {rascunho.telas.map((t) => {
+                  const rotulo = porId.get(t.tela)?.rotulo ?? t.tela
+                  const travada = u.papel === 'admin' || t.modo === 'todos'
+                  const marcada = travada || t.emails.includes(u.email)
+                  const pendente = !travada && marcada !== viaAntes(t.tela, u.email)
+                  return (
+                    <td
+                      key={t.tela}
+                      className={`centro${pendente ? ' pendente' : ''}`}
+                      title={
+                        u.papel === 'admin'
+                          ? 'Administrador vê todas as telas pelo papel.'
+                          : t.modo === 'todos'
+                            ? 'Liberada para todos do domínio. Desmarque "Todos do domínio" para escolher pessoas.'
+                            : undefined
                       }
                     >
-                      {modo === 'todos' ? 'Todos' : 'Lista'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {t.modo === 'lista' && pessoas.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5 border-t pt-3" style={{ borderColor: 'var(--border)' }}>
-                  {pessoas.map((email) => {
-                    const marcado = t.emails.includes(email)
-                    return (
-                      <label
-                        key={email}
-                        className="flex cursor-pointer items-center gap-1.5 rounded border px-2 py-1 text-[11px] transition-colors"
-                        style={{
-                          borderColor: marcado ? 'var(--brand)' : 'var(--border)',
-                          background: marcado
-                            ? 'color-mix(in srgb, var(--brand) 10%, transparent)'
-                            : 'transparent',
-                          color: 'var(--text-primary)',
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={marcado}
-                          onChange={(e) =>
-                            setRascunho((r) => ({
-                              ...r,
-                              telas: r.telas.map((x) =>
-                                x.tela === t.tela
-                                  ? {
-                                      ...x,
-                                      emails: e.target.checked
-                                        ? [...x.emails, email]
-                                        : x.emails.filter((m) => m !== email),
-                                    }
-                                  : x
-                              ),
-                            }))
-                          }
-                          className="size-3"
-                        />
-                        {email}
-                      </label>
-                    )
-                  })}
-                </div>
-              )}
-            </article>
-          )
-        })}
+                      <input
+                        type="checkbox"
+                        checked={marcada}
+                        disabled={travada}
+                        onChange={(e) =>
+                          alterarTela(t.tela, (x) => ({
+                            ...x,
+                            emails: e.target.checked
+                              ? [...x.emails, u.email]
+                              : x.emails.filter((m) => m !== u.email),
+                          }))
+                        }
+                        aria-label={`${rotulo} para ${u.email}`}
+                      />
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-    </section>
+    </div>
   )
 }
 
 /* ─────────────────────────── Peças compartilhadas ─────────────────────── */
 
 /**
- * A barra fica FIXA no rodapé e só aparece com alteração pendente.
- *
- * Numa lista longa, o botão de salvar no fim da página é o botão que ninguém
- * encontra: a pessoa mexe em três telas, rola para ver o resultado, e sai sem
- * gravar. A contagem no rótulo é o que transforma "salvar" em "salvar o quê".
+ * A barra de rascunho fica no topo da aba e SEMPRE aparece — neutra quando não
+ * há nada pendente, dourada quando há. Nada é gravado até o Salvar, e isso
+ * precisa estar à vista, não descoberto no rodapé de uma lista longa.
  */
-function BarraSalvar({
+function BarraRascunho({
   pendentes,
   salvando,
   erro,
@@ -486,117 +508,48 @@ function BarraSalvar({
   onDescartar: () => void
   onSalvar: () => void
 }) {
-  if (pendentes === 0 && !erro) return null
-
   return (
-    <div
-      className="fixed inset-x-0 bottom-0 z-40 border-t px-4 py-3"
-      style={{ borderColor: 'var(--border)', background: 'var(--surface-raised)' }}
-    >
-      <div className="mx-auto flex max-w-[1100px] flex-wrap items-center gap-3">
-        <span className="text-xs text-[var(--text-secondary)]">
-          {pendentes} alteração{pendentes === 1 ? '' : 'ões'} não salva
-          {pendentes === 1 ? '' : 's'}
+    <>
+      <div className={`ras-barra${pendentes ? ' ativa' : ''}`} role="status">
+        <Icone nome={pendentes ? 'alerta' : 'ok'} tamanho={15} />
+        <span>
+          {pendentes
+            ? `${pendentes} alteraç${pendentes === 1 ? 'ão' : 'ões'} não salva${pendentes === 1 ? '' : 's'}.`
+            : 'Nenhuma alteração pendente.'}
         </span>
-
-        {erro && (
-          <span className="text-xs" style={{ color: 'var(--status-critical)' }}>
-            {erro}
-          </span>
-        )}
-
-        <div className="ml-auto flex gap-2">
-          <button
-            type="button"
-            onClick={onDescartar}
-            disabled={salvando}
-            className="rounded border px-3 py-1.5 text-xs transition-colors hover:border-[var(--border-strong)] disabled:opacity-50"
-            style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-          >
-            Descartar
-          </button>
-          <button
-            type="button"
-            onClick={onSalvar}
-            disabled={salvando || pendentes === 0}
-            className="rounded px-4 py-1.5 text-xs font-medium transition-opacity disabled:opacity-50"
-            style={{ background: 'var(--brand)', color: 'var(--brand-ink)' }}
-          >
-            {salvando ? 'Salvando…' : 'Salvar'}
-          </button>
-        </div>
+        <button
+          type="button"
+          className="cfg-botao ghost"
+          onClick={onDescartar}
+          disabled={salvando || pendentes === 0}
+        >
+          Descartar
+        </button>
+        <button
+          type="button"
+          className="cfg-botao"
+          onClick={onSalvar}
+          disabled={salvando || pendentes === 0}
+        >
+          {salvando ? 'Salvando…' : 'Salvar'}
+        </button>
       </div>
-    </div>
+      {erro && (
+        <div className="banner error" role="alert">
+          <Icone nome="alerta" tamanho={14} /> {erro}
+        </div>
+      )}
+    </>
   )
 }
 
 function AvisoControleInativo() {
   return (
-    <p
-      className="mb-4 rounded border px-3 py-2 text-xs leading-relaxed"
-      style={{
-        borderColor: 'var(--status-warning)',
-        background: 'color-mix(in srgb, var(--status-warning) 12%, transparent)',
-        color: 'var(--text-primary)',
-      }}
-    >
-      <strong>Controle de acesso inativo.</strong> O diretório de dados não está gravável,
-      então <strong>todas as pessoas do domínio veem todas as telas</strong> e nada aqui pode
-      ser gravado. Confira o volume montado em{' '}
-      <code className="text-[11px]">/app/data</code> — no Portainer ele precisa existir na
-      stack, e o diretório precisa pertencer ao usuário <code className="text-[11px]">app</code>.
-    </p>
-  )
-}
-
-function Th({ children, alinhar }: { children: React.ReactNode; alinhar?: 'dir' }) {
-  return (
-    <th
-      className={`px-3 py-2 text-[11px] font-semibold tracking-wide uppercase ${
-        alinhar === 'dir' ? 'text-right' : 'text-left'
-      }`}
-      style={{ color: 'var(--text-secondary)' }}
-    >
-      {children}
-    </th>
-  )
-}
-
-function Vazio({ texto }: { texto: string }) {
-  return (
-    <p
-      className="rounded-lg border px-3 py-6 text-center text-xs"
-      style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
-    >
-      {texto}
-    </p>
-  )
-}
-
-/** Os três estados obrigatórios de toda tela deste dashboard. */
-function Estado3({
-  tipo,
-  mensagem,
-}: {
-  tipo: 'carregando' | 'erro' | 'vazio'
-  mensagem?: string
-}) {
-  const texto =
-    tipo === 'carregando'
-      ? 'Carregando configuração…'
-      : tipo === 'erro'
-        ? (mensagem ?? 'Não consegui ler a configuração.')
-        : 'Sem configuração para mostrar.'
-
-  return (
-    <p
-      className="mx-auto mt-10 max-w-[520px] rounded-lg border px-4 py-8 text-center text-xs"
-      style={{
-        borderColor: tipo === 'erro' ? 'var(--status-critical)' : 'var(--border)',
-        color: 'var(--text-secondary)',
-      }}
-    >
-      {texto}
-    </p>
+    <div className="banner" style={{ marginBottom: 12 }}>
+      <b>Controle de acesso inativo.</b> O diretório de dados não está gravável, então{' '}
+      <b>todas as pessoas do domínio veem todas as telas</b> e nada aqui pode ser gravado.
+      Confira o volume montado em <code>/app/data</code> — no Portainer ele precisa existir
+      na stack, e o diretório precisa pertencer ao usuário <code>app</code>.
+    </div>
   )
 }

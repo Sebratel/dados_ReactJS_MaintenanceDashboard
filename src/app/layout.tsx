@@ -1,10 +1,22 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import './casca.css'
+import './padrao.css'
 import { Provedores } from '@/components/Provedores'
 
+/**
+ * Título, favicon e cor do navegador IGUAIS aos dos outros dashboards Sebratel
+ * (casca da skill padrao-frontend-dashboards): "SIGLA - Nome | Sebratel", o logo
+ * circular e o vinho da marca. O favicon e o apple-touch-icon saem dos arquivos
+ * `icon.png` e `apple-icon.png` desta pasta, pela convenção do App Router.
+ */
 export const metadata: Metadata = {
-  title: 'Manutenção FTTX · Sebratel',
+  title: 'MAN - Manutenção FTTX | Sebratel',
   description: 'Dashboards de manutenção de fibra em tempo quase real',
+}
+
+export const viewport: Viewport = {
+  themeColor: '#880F17',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

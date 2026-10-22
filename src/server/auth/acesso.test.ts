@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   lerMatriz,
   listarUsuarios,
+  podeAbrir,
   removerUsuario,
   resolverAcesso,
   salvarTela,
@@ -169,6 +170,31 @@ describe('matriz de telas', () => {
  * O arquivo é um JSON num volume — editável à mão, e portanto capaz de chegar
  * torto. Nada aqui pode derrubar o dashboard nem abrir acesso por engano.
  */
+/**
+ * A regra que cada `page.tsx` aplica (via `PaginaProtegida`). Antes ela morava
+ * no layout e decidia com o caminho da tela anterior — item Z de docs/06.
+ */
+describe('abrir uma página', () => {
+  it('tela restrita: abre para quem está na lista e não para os outros', () => {
+    salvarTela('protocolos', 'lista', ['pode@sebratel.com.br'], 'eu@sebratel.com.br')
+    expect(podeAbrir(resolverAcesso('pode@sebratel.com.br'), 'protocolos')).toBe(true)
+    expect(podeAbrir(resolverAcesso('outra@sebratel.com.br'), 'protocolos')).toBe(false)
+  })
+
+  it('Configurações é do papel, não da matriz', () => {
+    salvarUsuario('chefe@sebratel.com.br', 'admin', 'eu@sebratel.com.br')
+    expect(podeAbrir(resolverAcesso('chefe@sebratel.com.br'), 'configuracoes')).toBe(true)
+    expect(podeAbrir(resolverAcesso('alguem@sebratel.com.br'), 'configuracoes')).toBe(false)
+  })
+
+  it('a Capa abre para todo mundo — inclusive quem não vê tela nenhuma', () => {
+    for (const t of TELAS) salvarTela(t.id, 'lista', [], 'eu@sebratel.com.br')
+    const ninguem = resolverAcesso('alguem@sebratel.com.br')
+    expect(ninguem.telas.size).toBe(0)
+    expect(podeAbrir(ninguem, 'capa')).toBe(true)
+  })
+})
+
 describe('arquivo torto', () => {
   it('JSON corrompido cai no padrão em vez de lançar', () => {
     writeFileSync(arquivo(), '{ isto não é json', 'utf8')

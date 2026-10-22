@@ -11,7 +11,6 @@ import {
   baseTooltip,
   rotuloValor,
 } from '@/lib/tema'
-import { useTemaAtual } from '@/lib/useTema'
 import { fmtDiaCurto, fmtFracaoPct, fmtInt } from '@/lib/formato'
 import type { PontoProdutividadeDia } from '@/server/indicadores/produtividade'
 
@@ -29,13 +28,11 @@ import type { PontoProdutividadeDia } from '@/server/indicadores/produtividade'
  */
 export function SerieAssertividade({
   dados,
-  altura = 170,
+  altura,
 }: {
   dados: PontoProdutividadeDia[]
   altura?: number
 }) {
-  // o memo abaixo lê as variáveis CSS do tema — ver useTema.ts
-  const tema = useTemaAtual()
 
   const option = useMemo(() => {
     const tk = lerTokens()
@@ -91,9 +88,11 @@ export function SerieAssertividade({
           symbol: 'circle',
           symbolSize: MARCA.tamanhoMarcador,
           showSymbol: dados.length <= 40,
-          lineStyle: { color: tk.series[0], width: MARCA.larguraLinha },
-          itemStyle: { color: tk.series[0] },
-          areaStyle: { color: `${tk.series[0]}14` },
+          // linha na SEGUNDA cor (laranja): o dourado é da coluna, e linha
+          // dourada fina sobre branco quase some (contraste ~2:1)
+          lineStyle: { color: tk.series[1], width: MARCA.larguraLinha },
+          itemStyle: { color: tk.series[1] },
+          areaStyle: { color: `${tk.series[1]}14` },
           // Série única, mesma justificativa de SerieMttr. Sem casa decimal:
           // "96%" ocupa metade de "96,4%", e a variação que interessa no painel
           // é de pontos inteiros -- a decimal fica no tooltip.
@@ -119,7 +118,7 @@ export function SerieAssertividade({
         },
       ],
     }
-  }, [dados, tema])
+  }, [dados])
 
   return (
     <Chart

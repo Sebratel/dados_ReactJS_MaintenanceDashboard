@@ -10,8 +10,7 @@ import {
   baseGrid,
   baseTooltip,
 } from '@/lib/tema'
-import { useTemaAtual } from '@/lib/useTema'
-import { fmtFracaoPct, fmtInt } from '@/lib/formato'
+import { fmtFracaoPct, fmtInt, semEmoji } from '@/lib/formato'
 
 export type ItemComposto = {
   rotulo: string
@@ -58,8 +57,6 @@ export function RankingComposto({
   realce?: 'assertividade' | 'improdutivo'
   rotuloEixo?: string
 }) {
-  // o memo abaixo lê as variáveis CSS do tema — ver useTema.ts
-  const tema = useTemaAtual()
 
   const option = useMemo(() => {
     const tk = lerTokens()
@@ -120,7 +117,7 @@ export function RankingComposto({
           if (!d) return ''
           const linha = (rot: string, v: number, cor: string) =>
             `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${cor};margin-right:6px"></span>${rot} <b>${fmtInt(v)}</b>`
-          return `<b>${d.rotulo}</b><br/>
+          return `<b>${semEmoji(d.rotulo)}</b><br/>
             ${linha('Produtivo', d.produtivo, tk.statusGood)}<br/>
             ${linha('Improdutivo', d.improdutivo, tk.statusCritical)}<br/>
             ${linha('Sem ação', d.semAcao, tk.statusWarning)}<br/>
@@ -140,7 +137,7 @@ export function RankingComposto({
       },
       xAxis: baseEixoValor(tk, { splitLine: { show: false } }),
       yAxis: baseEixoCategoria(tk, {
-        data: ordenado.map((d) => d.rotulo),
+        data: ordenado.map((d) => semEmoji(d.rotulo)),
         name: rotuloEixo,
         nameGap: 8,
         nameTextStyle: { color: tk.textMuted, fontSize: 0 },
@@ -160,13 +157,15 @@ export function RankingComposto({
         serie('Sem ação', tk.statusWarning, (d) => d.semAcao, true),
       ],
     }
-  }, [dados, rotuloEixo, realce, tema])
+  }, [dados, rotuloEixo, realce])
 
-  const h = altura ?? Math.max(160, dados.length * 26 + 40)
+  // sem altura fixa preenche o card; ~20px por barra é o piso legível
+  const minima = Math.max(150, dados.length * 20 + 40)
   return (
     <Chart
       option={option}
-      altura={h}
+      altura={altura}
+      alturaMinima={minima}
       aria-label="Ranking por desfecho das visitas, com assertividade de campo"
     />
   )

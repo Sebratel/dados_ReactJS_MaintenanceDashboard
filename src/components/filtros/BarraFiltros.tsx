@@ -1,12 +1,16 @@
 'use client'
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { CATALOGOS_MANUTENCAO, STATUS_CANCELADO, TIPOS_PREVENTIVOS } from '@/config/regras-negocio'
 import { EIXOS_DATA, GRANULARIDADES, parsearFiltros, presetsPeriodo, type Filtros } from '@/lib/filtros'
-import { fmtData } from '@/lib/formato'
 import { useOpcoesFiltro } from '@/lib/useIndicador'
+import { useAlturaComoVariavel } from '@/lib/useAlturaComoVariavel'
 import { telaDoCaminho } from '@/config/telas'
+import { Icone } from '@/components/Icone'
+import { Segmentado } from '@/components/Segmentado'
+import { SeletorLista } from './SeletorLista'
+import { SeletorPeriodo } from './SeletorPeriodo'
 
 const CAMPOS_MULTI = [
   // Base primeiro de propósito: é o corte de supervisão, o mais usado.
@@ -27,7 +31,8 @@ export function BarraFiltros() {
   const sp = useSearchParams()
   const filtros = useMemo(() => parsearFiltros(Object.fromEntries(sp.entries())), [sp])
   const { data: opcoes } = useOpcoesFiltro(filtros)
-  const [aberto, setAberto] = useState<string | null>(null)
+  // a altura real da barra entra na conta da área útil (ver o hook)
+  const medirBarra = useAlturaComoVariavel('--h-filtros', 'raiz')
 
   const aplicar = useCallback(
     (patch: Partial<Record<string, string | string[] | undefined>>) => {
@@ -42,7 +47,6 @@ export function BarraFiltros() {
   )
 
   const presets = useMemo(() => presetsPeriodo(), [])
-  const presetAtivo = presets.find((p) => p.de === filtros.de && p.ate === filtros.ate)
   const temFiltroDim = CAMPOS_MULTI.some((c) => filtros[c.chave]?.length)
   const eixoGovernaTela = pathname !== '/tempos'
 
@@ -162,66 +166,22 @@ export function BarraFiltros() {
   if (!telaDoCaminho(pathname)) return null
 
   return (
-    <div
-      className="sticky top-0 z-30 border-b bg-[var(--surface-page)]/95 backdrop-blur"
-      style={{ borderColor: 'var(--border)' }}
-    >
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-4 py-2.5">
-        {/* ── período ── */}
-        <Dropdown
-          id="periodo"
-          aberto={aberto}
-          setAberto={setAberto}
-          rotulo="Período"
-          valor={presetAtivo ? presetAtivo.label : `${fmtData(filtros.de)} – ${fmtData(filtros.ate)}`}
-          largura="w-64"
-        >
-          <div className="py-1">
-            {presets.map((p) => {
-              const ativo = p.de === filtros.de && p.ate === filtros.ate
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => {
-                    aplicar({ de: p.de, ate: p.ate, granularidade: p.granularidade })
-                    setAberto(null)
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-[var(--surface-raised)]"
-                >
-                  <span className="w-4 shrink-0 text-center font-bold" aria-hidden="true">
-                    {ativo ? '✓' : ''}
-                  </span>
-                  <span className={ativo ? 'font-semibold' : ''}>{p.label}</span>
-                </button>
-              )
-            })}
-          </div>
-          <div className="px-3 py-2" style={{ borderTop: '1px solid var(--border)' }}>
-            <span className="mb-1.5 block text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              Personalizado
-            </span>
-            <div className="flex items-center gap-1.5">
-              <input
-                type="date"
-                value={filtros.de}
-                max={filtros.ate}
-                onChange={(e) => aplicar({ de: e.target.value })}
-                className="w-full rounded border bg-transparent px-1.5 py-1 text-xs"
-                style={{ borderColor: 'var(--border)' }}
-              />
-              <span className="text-xs text-[var(--text-muted)]">→</span>
-              <input
-                type="date"
-                value={filtros.ate}
-                min={filtros.de}
-                onChange={(e) => aplicar({ ate: e.target.value })}
-                className="w-full rounded border bg-transparent px-1.5 py-1 text-xs"
-                style={{ borderColor: 'var(--border)' }}
-              />
-            </div>
-          </div>
-        </Dropdown>
+    /*
+     * A barra da casca Sebratel: uma linha grudada abaixo da navegação, cada
+     * filtro um botão compacto que abre o seletor. ~50px no lugar dos ~125px de
+     * cartões de slicer — numa tela em que a altura é o recurso escasso, a
+     * diferença é uma faixa de gráfico.
+     */
+    <div className="filtros-moldura" ref={medirBarra}>
+      <div className="filtros" role="toolbar" aria-label="Filtros">
+        <span className="rotulo">Filtros</span>
+
+        <SeletorPeriodo
+          de={filtros.de}
+          ate={filtros.ate}
+          presets={presets}
+          aoAplicar={(p) => aplicar(p)}
+        />
 
         {/* ── eixo da data: o filtro que o Power BI escondia em USERELATIONSHIP ──
             Some na tela de Tempos, onde não governa nada: lá os dois eixos são
@@ -229,146 +189,80 @@ export function BarraFiltros() {
             capacidade pela abertura). Deixá-lo clicável e inerte seria pior que
             não tê-lo — a pessoa trocaria, nada mudaria, e a conclusão natural
             seria que a tela está quebrada. */}
+        <span className="grupo-rotulo">Eixo</span>
         {eixoGovernaTela ? (
-          <SegmentControl
+          <Segmentado
+            claro
             rotulo="Eixo da data"
-            opcoes={Object.entries(EIXOS_DATA).map(([k, v]) => ({ id: k, label: v.label }))}
             valor={filtros.eixo}
-            onChange={(v) => aplicar({ eixo: v })}
-            destaque
+            aoMudar={(v) => aplicar({ eixo: v })}
+            opcoes={Object.entries(EIXOS_DATA).map(([k, v]) => ({
+              valor: k as Filtros['eixo'],
+              rotulo: v.label,
+            }))}
           />
         ) : (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-[var(--text-muted)]">Eixo da data</span>
-            <span
-              className="rounded border px-2 py-1.5 text-[11px] text-[var(--text-muted)]"
-              style={{ borderColor: 'var(--border)' }}
-              title="Nesta tela o eixo é fixo: desempenho (MTTR/MTTA) conta pelo encerramento, capacidade (mapa de calor) conta pela abertura. Os demais filtros valem normalmente."
-            >
-              fixo por indicador
-            </span>
-          </div>
+          <span
+            className="filtro-fixo"
+            title="Nesta tela o eixo é fixo: desempenho (MTTR/MTTA) conta pelo encerramento, capacidade (mapa de calor) conta pela abertura. Os demais filtros valem normalmente."
+          >
+            fixo por indicador
+          </span>
         )}
 
-        <SegmentControl
+        {/* sem rótulo de grupo: "Dia / Semana / Mês" se explica sozinho, e os
+            ~45px economizados são o que faz a barra caber numa linha em 1440 */}
+        <Segmentado
+          claro
           rotulo="Granularidade"
-          opcoes={Object.entries(GRANULARIDADES).map(([k, v]) => ({ id: k, label: v.label }))}
           valor={filtros.granularidade}
-          onChange={(v) => aplicar({ granularidade: v })}
+          aoMudar={(v) => aplicar({ granularidade: v })}
+          opcoes={Object.entries(GRANULARIDADES).map(([k, v]) => ({
+            valor: k as Filtros['granularidade'],
+            rotulo: v.label,
+          }))}
         />
 
-        <span className="mx-1 h-5 w-px" style={{ background: 'var(--border)' }} aria-hidden="true" />
+        <span className="divisor" aria-hidden="true" />
 
         {/* ── filtros de dimensão ── */}
-        {CAMPOS_MULTI.map((c) => {
-          const sel = filtros[c.chave] ?? []
-          let lista = opcoes?.[c.chave] ?? []
+        {CAMPOS_MULTI.map((c, i) => {
+          let lista: readonly string[] = opcoes?.[c.chave] ?? []
           if (c.chave === 'tipo' && tiposPermitidos)
             lista = lista.filter((v) => tiposPermitidos.includes(v))
           if (c.chave === 'catalogo' && catalogosPermitidos)
             lista = lista.filter((v) => catalogosPermitidos.includes(v))
-          const rotuloSel =
-            sel.length === 0 ? 'Todos' : sel.length === 1 ? sel[0]! : `${sel.length} selec.`
-          if (c.chave === 'status' && !statusGovernaTela) {
-            return (
-              <Dropdown
-                key={c.chave}
-                id={c.chave}
-                aberto={aberto}
-                setAberto={setAberto}
-                rotulo={c.label}
-                valor="Todos · por regra"
-                largura="w-72"
-              >
-                <div className="max-h-72 overflow-auto py-1">
-                  {lista.length === 0 && (
-                    <p className="px-3 py-2 text-xs text-[var(--text-muted)]">carregando…</p>
-                  )}
-                  {/* linhas INERTES: span, não button — todas marcadas, nenhuma clicável */}
-                  {lista.map((v) => (
-                    <span
-                      key={v}
-                      className="flex w-full items-start gap-2 px-3 py-1.5 text-left text-xs text-[var(--text-muted)]"
-                    >
-                      <span className="w-4 shrink-0 text-center font-bold" aria-hidden="true">
-                        ✓
-                      </span>
-                      <span>{v}</span>
-                    </span>
-                  ))}
-                </div>
-                <p
-                  className="px-3 py-2 text-[11px] leading-snug text-[var(--text-muted)]"
-                  style={{ borderTop: '1px solid var(--border)' }}
-                >
-                  Todos contam <strong>por regra</strong>, Cancelado inclusive: esta tela mede{' '}
-                  <strong>visita</strong>, e a ida ao cliente aconteceu mesmo que o protocolo tenha
-                  morrido depois. Por isso o filtro não se aplica aqui — a seleção que você fez
-                  continua valendo nas outras abas.
-                </p>
-              </Dropdown>
-            )
-          }
+          const inerte =
+            c.chave === 'status' && !statusGovernaTela ? (
+              <>
+                Todos contam <strong>por regra</strong>, Cancelado inclusive: esta tela mede{' '}
+                <strong>visita</strong>, e a ida ao cliente aconteceu mesmo que o protocolo tenha
+                morrido depois. Por isso o filtro não se aplica aqui — a seleção que você fez
+                continua valendo nas outras abas.
+              </>
+            ) : undefined
           return (
-            <Dropdown
+            <SeletorLista
               key={c.chave}
-              id={c.chave}
-              aberto={aberto}
-              setAberto={setAberto}
               rotulo={c.label}
-              valor={rotuloSel}
-              ativo={sel.length > 0}
-              largura="w-72"
-            >
-              <div className="max-h-72 overflow-auto py-1">
-                {lista.length === 0 && (
-                  <p className="px-3 py-2 text-xs text-[var(--text-muted)]">carregando…</p>
-                )}
-                {lista.map((v) => {
-                  const marcado = sel.includes(v)
-                  return (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() =>
-                        aplicar({
-                          [c.chave]: marcado ? sel.filter((x) => x !== v) : [...sel, v],
-                        })
-                      }
-                      className="flex w-full items-start gap-2 px-3 py-1.5 text-left text-xs hover:bg-[var(--surface-raised)]"
-                    >
-                      <span className="w-4 shrink-0 text-center font-bold" aria-hidden="true">
-                        {marcado ? '✓' : ''}
-                      </span>
-                      <span className={marcado ? 'font-semibold' : ''}>{v}</span>
-                    </button>
-                  )
-                })}
-              </div>
-              {sel.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => aplicar({ [c.chave]: undefined })}
-                  className="w-full px-3 py-2 text-left text-xs text-[var(--brand)] hover:bg-[var(--surface-raised)]"
-                  style={{ borderTop: '1px solid var(--border)' }}
-                >
-                  Limpar {c.label.toLowerCase()}
-                </button>
-              )}
-            </Dropdown>
+              opcoes={lista}
+              selecionados={filtros[c.chave] ?? []}
+              aoAplicar={(v) => aplicar({ [c.chave]: v })}
+              inerte={inerte}
+              direita={i >= CAMPOS_MULTI.length - 3}
+            />
           )
         })}
 
         {temFiltroDim && (
           <button
             type="button"
+            className="limpar"
             onClick={() =>
               aplicar(Object.fromEntries(CAMPOS_MULTI.map((c) => [c.chave, undefined])))
             }
-            className="ml-auto rounded border px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            style={{ borderColor: 'var(--border)' }}
           >
-            Limpar filtros
+            <Icone nome="fechar" tamanho={12} /> Limpar filtros
           </button>
         )}
       </div>
@@ -381,16 +275,8 @@ export function BarraFiltros() {
         deixa de ser demanda. Sem esta linha, os três números parecem defeito.
       */}
       {filtros.status?.includes(STATUS_CANCELADO) && (
-        <div
-          className="flex items-start gap-2 border-t px-4 py-1.5 text-[11px]"
-          style={{
-            borderColor: 'var(--border)',
-            background: 'color-mix(in srgb, var(--status-warning) 12%, transparent)',
-            color: 'var(--text-secondary)',
-          }}
-          role="note"
-        >
-          <span aria-hidden="true">⚠</span>
+        <div className="aviso aviso-faixa" role="note">
+          <Icone nome="alerta" tamanho={13} />
           <span>
             <strong>Cancelados incluídos.</strong> Eles ficam fora do universo por
             padrão porque não são demanda real — aqui, taxa de encerramento vai a 0% e
@@ -400,101 +286,6 @@ export function BarraFiltros() {
           </span>
         </div>
       )}
-    </div>
-  )
-}
-
-function Dropdown({
-  id,
-  aberto,
-  setAberto,
-  rotulo,
-  valor,
-  children,
-  ativo = false,
-  largura = 'w-64',
-}: {
-  id: string
-  aberto: string | null
-  setAberto: (v: string | null) => void
-  rotulo: string
-  valor: string
-  children: React.ReactNode
-  ativo?: boolean
-  largura?: string
-}) {
-  const eu = aberto === id
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setAberto(eu ? null : id)}
-        aria-expanded={eu}
-        className="flex items-center gap-1.5 rounded border px-2 py-1.5 text-xs transition-colors hover:border-[var(--border-strong)]"
-        style={{
-          borderColor: ativo ? 'var(--brand)' : 'var(--border)',
-          background: 'var(--surface-1)',
-        }}
-      >
-        <span className="text-[var(--text-muted)]">{rotulo}</span>
-        <span className="max-w-40 truncate font-medium text-[var(--text-primary)]">{valor}</span>
-        <span className="text-[var(--text-muted)]" aria-hidden="true">
-          ▾
-        </span>
-      </button>
-      {eu && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setAberto(null)} aria-hidden="true" />
-          <div
-            className={`absolute left-0 z-50 mt-1 ${largura} overflow-hidden rounded-lg border shadow-lg`}
-            style={{ borderColor: 'var(--border-strong)', background: 'var(--surface-1)' }}
-          >
-            {children}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
-function SegmentControl<T extends string>({
-  rotulo,
-  opcoes,
-  valor,
-  onChange,
-  destaque = false,
-}: {
-  rotulo: string
-  opcoes: { id: string; label: string }[]
-  valor: T
-  onChange: (v: T) => void
-  destaque?: boolean
-}) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[11px] text-[var(--text-muted)]">{rotulo}</span>
-      <div
-        className="flex overflow-hidden rounded border text-[11px]"
-        style={{ borderColor: destaque ? 'var(--brand)' : 'var(--border)' }}
-        role="group"
-        aria-label={rotulo}
-      >
-        {opcoes.map((o) => (
-          <button
-            key={o.id}
-            type="button"
-            onClick={() => onChange(o.id as T)}
-            aria-pressed={valor === o.id}
-            className={`px-2 py-1.5 transition-colors ${
-              valor === o.id
-                ? 'bg-[var(--brand)] font-medium text-[var(--brand-ink)]'
-                : 'bg-[var(--surface-1)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
     </div>
   )
 }

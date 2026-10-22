@@ -90,6 +90,21 @@ export function obterPoolErp(): Pool {
 export type ResultadoQuery<T> = { rows: T[]; ms: number }
 
 /**
+ * Quando o ERP respondeu pela última vez, e quando falhou.
+ *
+ * É o que a Capa mostra em "Atualização dos dados", e é DE GRAÇA: sai das
+ * consultas que as telas já fazem. Perguntar ao banco "você está aí?" para
+ * preencher um selo seria carga na réplica para responder uma pergunta que as
+ * próprias telas já respondem. Memória do processo: zera num restart, e até a
+ * primeira consulta a Capa diz "—", que é a verdade.
+ */
+const estado = { ultimaLeitura: 0, ultimaFalha: 0 }
+
+export function estadoErp(): { ultimaLeitura: number; ultimaFalha: number } {
+  return { ...estado }
+}
+
+/**
  * Executa SQL no ERP com binding de parâmetros.
  * Nunca interpolar valor em string — sempre $1, $2, …
  */
@@ -98,7 +113,14 @@ export async function consultarErp<T extends QueryResultRow>(
   params: readonly unknown[] = []
 ): Promise<ResultadoQuery<T>> {
   const t0 = performance.now()
-  const r = await obterPoolErp().query<T>(sql, params as unknown[])
+  let r
+  try {
+    r = await obterPoolErp().query<T>(sql, params as unknown[])
+  } catch (e) {
+    estado.ultimaFalha = Date.now()
+    throw e
+  }
+  estado.ultimaLeitura = Date.now()
   const ms = Math.round(performance.now() - t0)
   if (ms > 5_000) {
     console.warn(`[erp] consulta lenta (${ms}ms): ${sql.slice(0, 120).replace(/\s+/g, ' ')}…`)

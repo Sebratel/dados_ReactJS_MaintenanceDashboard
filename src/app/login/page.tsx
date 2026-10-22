@@ -4,7 +4,7 @@ import { dominioPermitido, obterConfigFirebase } from '@/server/auth/configClien
 import { TelaLogin } from './TelaLogin'
 
 export const metadata: Metadata = {
-  title: 'Entrar · Manutenção FTTX',
+  title: 'Entrar · MAN - Manutenção FTTX | Sebratel',
 }
 
 /**

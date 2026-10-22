@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { PaginaProtegida } from '@/components/PaginaProtegida'
 import { VisaoExecutivaConteudo } from './Conteudo'
 
 /**
@@ -10,8 +11,10 @@ import { VisaoExecutivaConteudo } from './Conteudo'
  */
 export default function Pagina() {
   return (
-    <Suspense fallback={<div className="h-96" aria-busy="true" />}>
-      <VisaoExecutivaConteudo />
-    </Suspense>
+    <PaginaProtegida tela="executivo">
+      <Suspense fallback={<div className="h-96" aria-busy="true" />}>
+        <VisaoExecutivaConteudo />
+      </Suspense>
+    </PaginaProtegida>
   )
 }

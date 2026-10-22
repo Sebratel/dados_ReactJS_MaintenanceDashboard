@@ -1,4 +1,4 @@
-import { readdirSync, existsSync } from 'node:fs'
+import { readdirSync, existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { INDICADORES } from '@/server/indicadores'
@@ -28,9 +28,10 @@ function rotasEmDisco(): string[] {
 
 /**
  * Rotas do grupo que NÃO são telas de dados e por isso não entram na matriz.
- * Quem decide quem as vê é o papel, não a lista de pessoas.
+ * Configurações é decidida pelo papel; a Capa é de todos (não mostra dado
+ * restrito, só o que o painel é e de onde vêm os números).
  */
-const FORA_DA_MATRIZ = new Set(['/configuracoes'])
+const FORA_DA_MATRIZ = new Set(['/configuracoes', '/capa'])
 
 describe('catálogo de telas', () => {
   it('cobre todas as rotas que existem em disco', () => {
@@ -103,8 +104,9 @@ describe('telaDoCaminho como regra da barra de filtros', () => {
     }
   })
 
-  it('NÃO reconhece /configuracoes — lá não há o que recortar', () => {
+  it('NÃO reconhece /configuracoes nem /capa — lá não há o que recortar', () => {
     expect(telaDoCaminho('/configuracoes')).toBeUndefined()
+    expect(telaDoCaminho('/capa')).toBeUndefined()
   })
 
   it('rota desconhecida nasce SEM barra, em vez de esperar quem a proíba', () => {
@@ -113,4 +115,30 @@ describe('telaDoCaminho como regra da barra de filtros', () => {
     expect(telaDoCaminho('/rota-que-ainda-nao-existe')).toBeUndefined()
     expect(telaDoCaminho('/login')).toBeUndefined()
   })
+})
+
+/**
+ * O PORTÃO MORA EM CADA PÁGINA — e por isso cada página precisa tê-lo.
+ *
+ * Desde 22/10/2026 quem decide se a tela abre é `<PaginaProtegida>`, dentro do
+ * `page.tsx` (o layout decidia com o caminho da tela anterior — item Z de
+ * docs/06). O risco que isso troca de lugar é a página nova nascer sem o
+ * portão: aberta para todo mundo, sem erro nenhum. Este teste lê as páginas em
+ * disco e transforma esse esquecimento em build vermelho — e pega também a
+ * página que declara a tela ERRADA, que abriria pela regra de outra.
+ */
+describe('toda página do grupo passa pelo portão', () => {
+  const esperado = (rota: string): string =>
+    rota === '/configuracoes' ? 'configuracoes'
+      : rota === '/capa' ? 'capa'
+        : (telaDoCaminho(rota)?.id ?? `(rota ${rota} fora do catálogo)`)
+
+  for (const rota of rotasEmDisco()) {
+    it(`${rota} usa <PaginaProtegida tela="${esperado(rota)}">`, () => {
+      const arq = join(RAIZ_DASHBOARD, rota === '/' ? '' : rota.slice(1), 'page.tsx')
+      const fonte = readFileSync(arq, 'utf8')
+      const telas = [...fonte.matchAll(/<PaginaProtegida\s+tela="([^"]+)"/g)].map((m) => m[1])
+      expect(telas).toEqual([esperado(rota)])
+    })
+  }
 })

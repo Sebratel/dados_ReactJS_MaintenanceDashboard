@@ -8,9 +8,9 @@ import {
   baseEixoValor,
   baseGrid,
   baseTooltip,
+  gradienteColuna,
   rotuloValor,
 } from '@/lib/tema'
-import { useTemaAtual } from '@/lib/useTema'
 import { fmtInt, fmtPeriodo } from '@/lib/formato'
 import type { Granularidade } from '@/lib/filtros'
 
@@ -43,7 +43,7 @@ export type ColunaPeriodo = {
 export function ColunasPeriodo({
   dados,
   granularidade,
-  altura = 200,
+  altura,
   unidade = 'protocolos',
 }: {
   dados: ColunaPeriodo[]
@@ -51,8 +51,6 @@ export function ColunasPeriodo({
   altura?: number
   unidade?: string
 }) {
-  // o memo abaixo lê as variáveis CSS do tema — ver useTema.ts
-  const tema = useTemaAtual()
 
   const option = useMemo(() => {
     const tk = lerTokens()
@@ -79,7 +77,7 @@ export function ColunasPeriodo({
           type: 'bar' as const,
           data: dados.map((d) => d.valor),
           itemStyle: {
-            color: tk.series[0],
+            color: gradienteColuna(tk),
             borderRadius: [3, 3, 0, 0] as [number, number, number, number],
           },
           barMaxWidth: 46,
@@ -91,7 +89,7 @@ export function ColunasPeriodo({
         },
       ],
     }
-  }, [dados, granularidade, unidade, tema])
+  }, [dados, granularidade, unidade])
 
   return <Chart option={option} altura={altura} aria-label={`${unidade} por período`} />
 }
