@@ -58,17 +58,17 @@ export const config = {
    * mesma credencial para a imagem.
    *
    * Desde a casca padrão (22/10/2026) são dois logos com os nomes da skill —
-   * `logo-circular-sebratel.png` e o `logo-sebratel.svg` do topo — mais o
-   * favicon, que o App Router serve em `/icon.png` e `/apple-icon.png`. A lista
-   * antiga liberava `icon.svg`, que nunca existiu: o favicon da tela de login
-   * caía no redirecionamento e aparecia quebrado na aba.
+   * `logo-circular-sebratel.png`, que também é o favicon, e o
+   * `logo-sebratel.svg` do topo — mais o `favicon.ico`. A lista antiga
+   * liberava `icon.svg`, que nunca existiu: o favicon da tela de login caía no
+   * redirecionamento e aparecia quebrado na aba.
    *
    * ⚠️ A exclusão é NOMINAL, e não um `.*\\..*` que liberaria todo arquivo com
    * extensão: qualquer outro arquivo que nasça em `public/` deve ser uma decisão
    * consciente de publicar, não um efeito colateral de ter ponto no nome.
    */
   matcher: [
-    '/((?!_next/static|_next/image|favicon\\.ico|icon\\.png|apple-icon\\.png|logo-circular-sebratel\\.png|logo-sebratel\\.svg|api/health).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|logo-circular-sebratel\\.png|logo-sebratel\\.svg|api/health).*)',
   ],
 }
 

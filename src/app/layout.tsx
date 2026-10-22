@@ -7,12 +7,25 @@ import { Provedores } from '@/components/Provedores'
 /**
  * Título, favicon e cor do navegador IGUAIS aos dos outros dashboards Sebratel
  * (casca da skill padrao-frontend-dashboards): "SIGLA - Nome | Sebratel", o logo
- * circular e o vinho da marca. O favicon e o apple-touch-icon saem dos arquivos
- * `icon.png` e `apple-icon.png` desta pasta, pela convenção do App Router.
+ * circular e o vinho da marca.
+ *
+ * ⚠️ O ÍCONE APONTA DIRETO PARA `/logo-circular-sebratel.png`, como no
+ * `index.html` do comercial — e não para o `icon.png` da convenção do App
+ * Router, que foi a primeira tentativa. Aquele endereço (`/icon.png?hash`) já
+ * existia antes e, sem sessão, caía no redirecionamento do middleware para o
+ * login: o navegador guarda o favicon por endereço, e o ícone quebrado ficou
+ * preso mesmo depois do conserto. Endereço novo, cache novo.
+ *
+ * `favicon.ico` (16/32/48 px, gerado do mesmo logo) fica nesta pasta para quem
+ * pede `/favicon.ico` direto — aba de arquivo baixado, alguns navegadores.
  */
 export const metadata: Metadata = {
   title: 'MAN - Manutenção FTTX | Sebratel',
   description: 'Dashboards de manutenção de fibra em tempo quase real',
+  icons: {
+    icon: [{ url: '/logo-circular-sebratel.png', type: 'image/png' }],
+    apple: '/logo-circular-sebratel.png',
+  },
 }
 
 export const viewport: Viewport = {
