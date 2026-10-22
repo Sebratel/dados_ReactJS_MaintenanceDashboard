@@ -42,7 +42,7 @@ export type ColunaPeriodo = {
 export function ColunasPeriodo({
   dados,
   granularidade,
-  altura = 200,
+  altura,
   unidade = 'protocolos',
 }: {
   dados: ColunaPeriodo[]

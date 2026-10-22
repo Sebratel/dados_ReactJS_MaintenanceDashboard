@@ -25,7 +25,7 @@ import type { Granularidade } from '@/lib/filtros'
 export function SerieMttr({
   dados,
   granularidade,
-  altura = 200,
+  altura,
 }: {
   dados: PontoSerie[]
   granularidade: Granularidade

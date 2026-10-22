@@ -134,6 +134,20 @@ export function fmtInstante(quando: string | number): string {
   })
 }
 
+/**
+ * Tira emoji de um RÓTULO vindo do banco, só para exibir.
+ *
+ * O `region_title` da agenda do Voalle vem com um ✅ na frente
+ * ("✅Base São Leopoldo"). A casca não usa emoji em lugar nenhum, nem herdado
+ * da origem: ele muda de desenho por sistema operacional e desalinha a linha.
+ * ⚠️ É só para a tela — o valor que vai para o filtro e para a URL continua o
+ * original, senão o recorte deixaria de casar com o banco.
+ */
+const PICTOGRAFICO = new RegExp('[\\p{Extended_Pictographic}\\u{FE0F}]', 'gu')
+export function semEmoji(texto: string): string {
+  return texto.replace(PICTOGRAFICO, '').trim()
+}
+
 /** Sinal explícito para variação: "+12,3%" / "−4,1%" */
 export function fmtVariacao(n: number | null | undefined): string {
   if (n === null || n === undefined || !Number.isFinite(n)) return '—'

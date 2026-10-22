@@ -20,7 +20,7 @@ import type { Granularidade } from '@/lib/filtros'
 export function SerieTemporal({
   dados,
   granularidade,
-  altura = 260,
+  altura,
   comZoom = false,
 }: {
   dados: PontoSerie[]

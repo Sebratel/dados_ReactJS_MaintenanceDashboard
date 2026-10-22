@@ -41,8 +41,19 @@ echarts.use([
 
 export type ChartProps = {
   option: echarts.EChartsCoreOption
-  /** altura em px; o gráfico rola no próprio container se precisar */
+  /**
+   * Altura fixa em px. SEM ELA o gráfico preenche o corpo do card, e quem
+   * decide a altura é o card (`classe` do Painel, calculada pela área útil da
+   * tela). Altura fixa fica para card `v-auto`, que não tem altura própria.
+   */
   altura?: number
+  /**
+   * Piso quando o gráfico preenche o card: abaixo disto ele não encolhe, e o
+   * corpo do card rola. É o caso dos rankings, cuja altura legível depende do
+   * número de barras — 30 técnicos não cabem em 250px, e espremer a barra a
+   * 3px seria pior que rolar.
+   */
+  alturaMinima?: number
   className?: string
   'aria-label'?: string
   /**
@@ -52,7 +63,14 @@ export type ChartProps = {
   aoClicar?: (dataIndex: number) => void
 }
 
-export function Chart({ option, altura = 280, className, aoClicar, ...rest }: ChartProps) {
+export function Chart({
+  option,
+  altura,
+  alturaMinima = 160,
+  className,
+  aoClicar,
+  ...rest
+}: ChartProps) {
   const ref = useRef<HTMLDivElement>(null)
   const inst = useRef<echarts.ECharts | null>(null)
 
@@ -99,7 +117,13 @@ export function Chart({ option, altura = 280, className, aoClicar, ...rest }: Ch
       ref={ref}
       role="img"
       className={className}
-      style={{ height: altura, width: '100%', cursor: aoClicar ? 'pointer' : undefined }}
+      style={{
+        ...(altura === undefined
+          ? { flex: '1 0 auto', height: 0, minHeight: alturaMinima }
+          : { height: altura, flex: 'none' }),
+        width: '100%',
+        cursor: aoClicar ? 'pointer' : undefined,
+      }}
       {...rest}
     />
   )

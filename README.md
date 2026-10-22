@@ -234,6 +234,22 @@ O ponto e o "há X" do topo são a idade do **dado** mais velho da tela
 servidor pode servir um valor guardado por até 20× a validade dele enquanto
 recalcula. Dourado = mais de 30 min; vermelho = algum painel com erro.
 
+**Altura dos cards.** Cada painel tem uma `classe` de altura (`v-grafico`,
+`v-tabela`, `v-meia`, `v-cheia`, `v-auto`) que é fração da área útil da janela,
+e o gráfico preenche o card. A barra de filtros e a faixa de KPIs **medem a
+própria altura** e entram na conta (`useAlturaComoVariavel`), porque a barra
+quebra em duas linhas em telas estreitas. Conferido em 1440×900 e 1920×1080:
+KPIs + duas faixas cabem na janela. Abaixo disso valem os pisos da skill, e a
+página rola em vez de espremer o gráfico. Ranking com muitas barras rola dentro
+do próprio card.
+
+**Filtros com Aplicar.** Os filtros de lista guardam a marcação num rascunho e
+só viram URL no **Aplicar** — antes, cada caixa marcada era um recorte novo e
+uma consulta por painel no ERP. Lista com mais de 10 opções abre em diálogo com
+busca. O período personalizado só vale no **Aplicar período**, com as duas
+datas completas: o campo de data do Chrome mandava o ano pela metade (0002,
+0020…) a cada tecla, e "de 0002-10-01" é o histórico inteiro.
+
 A **Capa** (`/capa`) é de todo mundo que entrou e não consulta o ERP: o frescor
 sai das consultas que as telas já fazem, e a base de clientes é uma soma de um
 dia no Data Hub, guardada por 1 h (`src/server/status.ts`). `/` continua sendo o

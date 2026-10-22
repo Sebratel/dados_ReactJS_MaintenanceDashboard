@@ -15,9 +15,12 @@ export type StatTileProps = {
 }
 
 /**
- * Tile de KPI. O número é o protagonista — figuras proporcionais (não tabulares,
- * porque não está em coluna). A variação nunca comunica só por cor: leva seta
- * (↑/↓) e o valor percentual explícito.
+ * Cartão de KPI — o `Kpi` da skill padrao-frontend-dashboards: número grande,
+ * rótulo e uma linha de definição (nome de indicador sozinho raramente basta).
+ *
+ * A borda de cima carrega o papel do cartão: vinho no normal, dourado no
+ * destaque da tela, e as cores de ESTADO quando há estado — nunca enfeite. A
+ * variação nunca comunica só por cor: leva seta (↑/↓) e o valor percentual.
  */
 export function StatTile({
   rotulo,
@@ -42,6 +45,9 @@ export function StatTile({
         ? 'var(--status-critical)'
         : 'var(--text-muted)'
 
+  const classeEstado =
+    status === 'good' ? 'bom' : status === 'warning' ? 'atencao' : status === 'critical' ? 'alerta' : ''
+
   const corStatus =
     status === 'good'
       ? 'var(--status-good)'
@@ -52,44 +58,28 @@ export function StatTile({
           : null
 
   return (
-    <div
-      className="flex flex-col justify-between rounded-lg border bg-[var(--surface-1)] px-4 py-3"
-      style={{
-        borderColor: destaque ? 'var(--brand)' : 'var(--border)',
-        borderLeftWidth: destaque ? 3 : 1,
-      }}
-    >
-      <div className="flex items-center gap-1.5">
+    <div className={`kpi ${classeEstado || (destaque ? 'destaque' : '')}`}>
+      <span className="rotulo">
         {corStatus && (
           <span
             aria-hidden="true"
-            className="inline-block size-2 shrink-0 rounded-full"
-            style={{ background: corStatus }}
+            style={{ width: 8, height: 8, borderRadius: '50%', background: corStatus, flex: 'none' }}
           />
         )}
-        <span className="text-[11px] font-medium tracking-wide uppercase text-[var(--text-muted)]">
-          {rotulo}
-        </span>
-      </div>
+        {rotulo}
+      </span>
 
-      <div className="mt-1.5 flex items-baseline gap-2">
-        <span className="text-[26px] leading-none font-semibold text-[var(--text-primary)]">
-          {valor}
-        </span>
+      <span className="linha-valor">
+        <span className="valor">{valor}</span>
         {temVar && (
-          <span
-            className="flex items-center gap-0.5 text-xs font-medium"
-            style={{ color: corVar }}
-          >
+          <span className="variacao" style={{ color: corVar }}>
             <span aria-hidden="true">{subiu ? '↑' : desceu ? '↓' : '→'}</span>
             {fmtVariacao(variacao)}
           </span>
         )}
-      </div>
+      </span>
 
-      {contexto && (
-        <div className="mt-1 text-[11px] leading-snug text-[var(--text-muted)]">{contexto}</div>
-      )}
+      {contexto && <span className="desc">{contexto}</span>}
     </div>
   )
 }

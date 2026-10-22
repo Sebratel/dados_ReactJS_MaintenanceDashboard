@@ -87,7 +87,9 @@ export default async function LayoutDashboard({ children }: { children: React.Re
       <Suspense fallback={<div style={{ height: 50 }} />}>
         <BarraFiltros />
       </Suspense>
-      <main className="px-4 py-4">{children}</main>
+      {/* sem padding aqui: cada tela abre com `.pagina` (padrao.css), que tem o
+          dela e a conta de altura das faixas */}
+      <main>{children}</main>
     </SessaoFirebase>
   )
 }

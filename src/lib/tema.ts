@@ -180,6 +180,9 @@ export function rotuloValor({
 
 export function baseTooltip(tk: TokensTema, extra?: Record<string, unknown>) {
   return {
+    // A dica fica DENTRO da área do gráfico: o corpo do card rola quando um
+    // ranking não cabe, e uma dica que vaza para fora seria cortada pela borda.
+    confine: true,
     backgroundColor: tk.surface,
     borderColor: tk.axis,
     borderWidth: 1,

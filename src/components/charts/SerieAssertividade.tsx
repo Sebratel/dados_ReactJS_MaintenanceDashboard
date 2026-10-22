@@ -28,7 +28,7 @@ import type { PontoProdutividadeDia } from '@/server/indicadores/produtividade'
  */
 export function SerieAssertividade({
   dados,
-  altura = 170,
+  altura,
 }: {
   dados: PontoProdutividadeDia[]
   altura?: number

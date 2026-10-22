@@ -39,7 +39,7 @@ export type PontoVolumeCoef = {
  */
 export function VolumeComCoeficiente({
   dados,
-  altura = 300,
+  altura,
   rotuloVolume = 'Volume',
 }: {
   dados: PontoVolumeCoef[]

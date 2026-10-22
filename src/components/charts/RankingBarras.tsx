@@ -107,6 +107,14 @@ export function RankingBarras({
     }
   }, [dados, onSelecionar, escala])
 
-  const h = altura ?? Math.max(160, dados.length * 26 + 24)
-  return <Chart option={option} altura={h} aria-label="Ranking de protocolos por dimensão" />
+  // sem altura fixa preenche o card; abaixo de ~18px por barra o rótulo
+  // deixa de caber, e aí o corpo do card rola em vez de espremer
+  return (
+    <Chart
+      option={option}
+      altura={altura}
+      alturaMinima={Math.max(140, dados.length * 18 + 24)}
+      aria-label="Ranking de protocolos por dimensão"
+    />
+  )
 }

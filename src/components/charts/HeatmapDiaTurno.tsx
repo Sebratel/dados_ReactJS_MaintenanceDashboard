@@ -20,7 +20,7 @@ export { FAIXAS_MTTR, faixaMttr } from '@/lib/heatmapOpcao'
 export function HeatmapDiaTurno({
   dados,
   metrica = 'protocolos',
-  altura = 220,
+  altura,
 }: {
   dados: CelulaHeatmap[]
   metrica?: 'protocolos' | 'mttr'

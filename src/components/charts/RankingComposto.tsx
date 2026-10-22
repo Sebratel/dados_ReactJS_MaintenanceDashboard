@@ -159,11 +159,13 @@ export function RankingComposto({
     }
   }, [dados, rotuloEixo, realce])
 
-  const h = altura ?? Math.max(160, dados.length * 26 + 40)
+  // sem altura fixa preenche o card; ~20px por barra é o piso legível
+  const minima = Math.max(150, dados.length * 20 + 40)
   return (
     <Chart
       option={option}
-      altura={h}
+      altura={altura}
+      alturaMinima={minima}
       aria-label="Ranking por desfecho das visitas, com assertividade de campo"
     />
   )

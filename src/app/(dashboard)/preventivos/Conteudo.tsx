@@ -7,6 +7,7 @@ import { useCoeficiente, usePreventivos } from '@/lib/useIndicador'
 import { Painel } from '@/components/Painel'
 import { LinkHistorico } from '@/components/LinkHistorico'
 import { StatTile } from '@/components/kpi/StatTile'
+import { Kpis } from '@/components/kpi/Kpis'
 import { RankingSimples } from '@/components/charts/RankingSimples'
 import { ColunasPeriodo } from '@/components/charts/ColunasPeriodo'
 import { fmtFracaoPct, fmtInt, fmtPeriodo } from '@/lib/formato'
@@ -64,11 +65,8 @@ export function PreventivosConteudo() {
   })
 
   return (
-    <div className="mx-auto flex max-w-[1600px] flex-col gap-4">
-      <p
-        className="rounded-md border px-3 py-2 text-xs text-[var(--text-secondary)]"
-        style={{ borderColor: 'var(--border)', background: 'var(--surface-1)' }}
-      >
+    <div className="pagina com-kpis">
+      <p className="nota-tela">
         A pergunta aqui não é quantas preventivas fizemos — é{' '}
         <strong>se a preventiva resolveu</strong>. Uma preventiva seguida de reparo no
         mesmo login em até 90 dias é <strong>reincidente</strong>. Toda preventiva do
@@ -88,11 +86,7 @@ export function PreventivosConteudo() {
         mensal à força e escolher "Dia" devolvia uma coluna só — o mesmo
         silêncio, e ele realmente foi lido como defeito.
       */}
-      <p
-        className="rounded-md border px-3 py-2 text-xs text-[var(--text-secondary)]"
-        style={{ borderColor: 'var(--border)', background: 'var(--surface-1)' }}
-        role="note"
-      >
+      <p className="nota-tela" role="note">
         <strong>Nesta página o período é sempre pela data de criação</strong> — a janela
         de 90 dias conta a partir da abertura da preventiva, então o controle de{' '}
         <em>eixo da data</em> não se aplica aqui. A <em>granularidade</em> vale para o
@@ -106,15 +100,7 @@ export function PreventivosConteudo() {
           sobe sozinha nas semanas seguintes. Sem este aviso, comparar julho com
           março seria comparar coisas diferentes sem saber. */}
       {t && t.recentes > 0 && (
-        <p
-          className="rounded border px-3 py-2 text-xs leading-relaxed"
-          style={{
-            borderColor: 'var(--status-warning)',
-            background: 'color-mix(in srgb, var(--status-warning) 10%, transparent)',
-            color: 'var(--text-primary)',
-          }}
-          role="status"
-        >
+        <p className="aviso" role="status" style={{ display: 'block' }}>
           <strong>Taxa ainda em formação.</strong> {fmtInt(t.recentes)} das{' '}
           {fmtInt(t.preventivas)} preventivas deste recorte têm menos de 90 dias, então
           ainda não tiveram a janela inteira para reincidir. A taxa tende a{' '}
@@ -144,11 +130,7 @@ export function PreventivosConteudo() {
         </p>
       )}
 
-      <section
-        className="grid gap-3"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}
-        aria-label="Reincidência após a preventiva"
-      >
+      <Kpis rotulo="Reincidência após a preventiva">
         <StatTile
           rotulo="Taxa de reincidência"
           valor={q.isLoading ? '…' : fmtFracaoPct(t?.taxaReincidencia, 1)}
@@ -215,7 +197,7 @@ export function PreventivosConteudo() {
               : undefined
           }
         />
-      </section>
+      </Kpis>
 
       {/* Volume no topo, como no visual `PROTOCOLOS PREVENTIVOS ABERTOS MÊS` do
           Power BI: antes de discutir qualidade, quanto se fez.
@@ -228,6 +210,7 @@ export function PreventivosConteudo() {
       {d && d.porPeriodo.length > 0 && (
         <Painel
           titulo={`Preventivas abertas por ${GRANULARIDADES[filtros.granularidade].label.toLowerCase()}`}
+          classe="v-grafico"
           descricao="Volume de protocolos preventivos criados — o tooltip traz a reincidência do período"
           acoes={<LinkHistorico metrica="preventivas" rotulo="% sobre a base" />}
           carregando={q.isLoading}
@@ -255,17 +238,14 @@ export function PreventivosConteudo() {
             }))}
             granularidade={filtros.granularidade}
             unidade="preventivas"
-            altura={210}
           />
         </Painel>
       )}
 
-      <div
-        className="grid gap-4"
-        style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)' }}
-      >
+      <div className="faixa dupla">
         <Painel
           titulo="Desfecho das preventivas"
+          classe="v-tabela"
           descricao="Quanto mais cedo o retorno, mais grave — a rampa mostra a ordem"
           carregando={q.isLoading}
           erro={erro}
@@ -294,13 +274,13 @@ export function PreventivosConteudo() {
               }))}
               unidade="preventivas"
               escala="ordinal"
-              altura={170}
             />
           )}
         </Painel>
 
         <Painel
           titulo="Por categoria da preventiva"
+          classe="v-tabela"
           descricao="Onde a ação preventiva não está resolvendo"
           carregando={q.isLoading}
           erro={erro}
@@ -320,12 +300,10 @@ export function PreventivosConteudo() {
         </Painel>
       </div>
 
-      <div
-        className="grid gap-4"
-        style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)' }}
-      >
+      <div className="faixa dupla">
         <Painel
           titulo="Por base"
+          classe="v-meia"
           descricao="Supervisões diferentes — use o filtro de Base para isolar a sua"
           carregando={q.isLoading}
           erro={erro}
@@ -339,13 +317,13 @@ export function PreventivosConteudo() {
                 detalhe: `reincidência ${fmtFracaoPct(x.taxaReincidencia, 1)}`,
               }))}
               unidade="preventivas"
-              altura={150}
             />
           )}
         </Painel>
 
         <Painel
           titulo="Por cidade"
+          classe="v-meia"
           descricao="Volume de preventiva e onde ela retorna"
           carregando={q.isLoading}
           erro={erro}
@@ -366,6 +344,7 @@ export function PreventivosConteudo() {
 
       <Painel
         titulo="Por técnico que atendeu a preventiva"
+        classe="v-tabela"
         descricao="Quem executou a preventiva — não quem atendeu o reparo que veio depois"
         carregando={q.isLoading}
         erro={erro}
@@ -380,7 +359,6 @@ export function PreventivosConteudo() {
               detalhe: `reincidência ${fmtFracaoPct(x.taxaReincidencia, 1)} · ${fmtInt(x.reincidentes)} de ${fmtInt(x.preventivas)}`,
             }))}
             unidade="preventivas"
-            altura={Math.max(180, Math.min(15, d.porTecnico.length) * 26)}
           />
         )}
       </Painel>
@@ -397,6 +375,7 @@ export function PreventivosConteudo() {
       {d && d.porMes.length > 1 && (
         <Painel
           titulo="Reincidência mês a mês"
+          classe="v-grafico"
           descricao="Meses recentes aparecem mais baixos: parte das preventivas ainda não completou 90 dias"
           carregando={q.isLoading}
           erro={erro}

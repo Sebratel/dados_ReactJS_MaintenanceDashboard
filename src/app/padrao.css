@@ -130,6 +130,67 @@
   flex-direction: column;
   min-height: 0;
   padding: 6px 8px 8px;
+  /* ranking com mais barras do que a altura comporta rola aqui dentro, em vez
+     de espremer a barra ou esticar o card além da tela */
+  overflow: auto;
+}
+
+/* seletor que vive na barra vinho (ex.: a dimensão da Operação) */
+.sel-cab {
+  height: 22px;
+  padding: 0 4px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 4px;
+  background: var(--pbi-white);
+  color: var(--pbi-ink);
+  font-family: var(--font);
+  font-size: 11px;
+}
+
+/* bloco de texto da página: o aviso de como ler a tela, sem ser alerta */
+.nota-tela {
+  padding: 8px 12px;
+  border: 1px solid var(--pbi-borda);
+  border-left: 3px solid var(--pbi-gold);
+  border-radius: 4px;
+  background: var(--pbi-white);
+  color: var(--pbi-ink-2);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* título de um grupo de faixas dentro da tela (ex.: Desempenho × Capacidade) */
+.titulo-grupo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 6px;
+}
+.titulo-grupo h2 {
+  margin: 0;
+  color: var(--pbi-primary);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.titulo-grupo .etiqueta-eixo {
+  padding: 1px 7px;
+  border: 1px solid var(--pbi-gold-600);
+  border-radius: 999px;
+  background: var(--pbi-gold-200);
+  color: var(--pbi-ink);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.titulo-grupo p {
+  flex-basis: 100%;
+  max-width: 110ch;
+  margin: 0;
+  color: var(--pbi-muted);
+  font-size: 11.5px;
+  line-height: 1.5;
 }
 .visual-nota {
   padding: 6px 10px 8px;
@@ -380,3 +441,282 @@ table.tabela.matriz tr.linha-todos td.pendente { background: var(--pbi-gold-200)
   line-height: 1.5;
 }
 .aviso svg { flex: none; margin-top: 2px; }
+
+/* busca que vive na barra vinho (Protocolos) */
+.busca-cab {
+  width: 250px;
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 4px;
+  background: var(--pbi-white);
+  color: var(--pbi-ink);
+  font-family: var(--font);
+  font-size: 11px;
+}
+
+/* ── barra de filtros (a mesma do COM · Gestão Comercial) ─────────── */
+
+/* a moldura gruda abaixo da navegação e leva junto o aviso de cancelados */
+.filtros-moldura {
+  position: sticky;
+  top: calc(var(--h-topbar) + var(--h-nav));
+  z-index: 30;
+}
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 50px;
+  padding: 7px 16px;
+  border-bottom: 1px solid var(--pbi-borda);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(6px);
+}
+.filtros .rotulo {
+  margin-right: 2px;
+  color: var(--pbi-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+}
+.filtros .grupo-rotulo {
+  margin-left: 4px;
+  color: var(--pbi-muted);
+  font-size: 11px;
+}
+.filtros .divisor {
+  width: 1px;
+  height: 20px;
+  margin: 0 3px;
+  background: var(--pbi-borda);
+}
+.filtros .seg.claro button { height: 28px; padding: 0 9px; font-size: 12px; }
+.filtro-fixo {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px dashed var(--pbi-grid);
+  border-radius: 8px;
+  color: var(--pbi-muted);
+  font-size: 12px;
+}
+.filtros .limpar {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--pbi-primary);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.filtros .limpar:hover { background: var(--pbi-hover); }
+.aviso-faixa { border-width: 0 0 1px; border-radius: 0; padding: 6px 16px; font-size: 11.5px; }
+
+.filtro { position: relative; }
+.filtro > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  max-width: 260px;
+  padding: 0 9px;
+  border: 1px solid var(--pbi-borda);
+  border-radius: 8px;
+  background: var(--pbi-white);
+  color: var(--pbi-ink);
+  font-family: var(--font);
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.filtro > button:hover { border-color: var(--pbi-primary); }
+.filtro > button .nome { color: var(--pbi-muted); font-weight: 600; }
+.filtro > button .valor { max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+.filtro > button svg { flex: none; color: var(--pbi-muted); }
+.filtro.ativo > button {
+  border-color: var(--pbi-primary);
+  background: var(--pbi-hover);
+  color: var(--pbi-primary);
+}
+.filtro.ativo > button .nome { color: var(--pbi-primary); }
+
+/* popover (lista curta) e diálogo (lista longa) compartilham as peças */
+.pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 60;
+  min-width: 270px;
+  max-width: 360px;
+  padding: 8px;
+  border: 1px solid var(--pbi-borda);
+  border-radius: 10px;
+  background: var(--pbi-white);
+  box-shadow: 0 12px 30px rgba(37, 36, 35, 0.22);
+}
+.pop.direita { right: 0; left: auto; }
+.pop .lista { display: grid; gap: 1px; max-height: 300px; overflow: auto; }
+.pop label,
+.dialogo-lista label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.pop label:hover,
+.dialogo-lista label:hover { background: var(--pbi-hover); }
+.pop label input,
+.dialogo-lista label input { flex: none; accent-color: var(--pbi-primary); }
+.pop label .txt,
+.dialogo-lista label .txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pop-vazio { padding: 6px 7px; color: var(--pbi-muted); font-size: 12px; }
+.pop-nota {
+  margin: 6px 0 0;
+  padding: 7px 7px 2px;
+  border-top: 1px solid var(--pbi-borda);
+  color: var(--pbi-muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.pop .opcao {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 7px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--pbi-ink);
+  font-family: var(--font);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.pop .opcao:hover { background: var(--pbi-hover); }
+.pop .opcao.marcada { color: var(--pbi-primary); font-weight: 600; }
+.pop .opcao .marca { display: grid; width: 16px; place-items: center; flex: none; }
+.pop-secao { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--pbi-borda); }
+.pop-titulo {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--pbi-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+.pop .datas { display: flex; align-items: center; gap: 6px; color: var(--pbi-muted); font-size: 12px; }
+.pop .datas input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 30px;
+  padding: 0 6px;
+  border: 1px solid var(--pbi-borda);
+  border-radius: 7px;
+  font-family: var(--font);
+  font-size: 12.5px;
+}
+.pop-erro { display: block; margin-top: 6px; color: var(--pbi-critico); font-size: 11.5px; }
+
+.pop .acoes,
+.dialogo .acoes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--pbi-borda);
+}
+.pop .acoes > span,
+.dialogo .acoes > span { color: var(--pbi-muted); font-size: 11px; }
+.pop .acoes .direita,
+.dialogo .acoes .direita { display: inline-flex; gap: 6px; }
+.pop .acoes button,
+.dialogo .acoes button {
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--pbi-primary);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pop .acoes button:disabled,
+.dialogo .acoes button:disabled { color: var(--pbi-muted); cursor: default; opacity: 0.6; }
+.pop .acoes button.secundario,
+.dialogo .acoes button.secundario { border-color: var(--pbi-grid); color: var(--pbi-ink); }
+.pop .acoes button.aplicar,
+.dialogo .acoes button.aplicar { background: var(--pbi-primary); color: var(--pbi-white); }
+.pop .acoes button.aplicar:disabled,
+.dialogo .acoes button.aplicar:disabled { background: var(--pbi-grid); color: var(--pbi-muted); }
+
+.dialogo-fundo {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(37, 36, 35, 0.45);
+}
+.dialogo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(780px, 100%);
+  max-height: min(80vh, 680px);
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--pbi-white);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+.dialogo-cab { display: flex; align-items: baseline; gap: 10px; }
+.dialogo-cab h2 { margin: 0; color: var(--pbi-primary); font-size: 15px; font-weight: 700; }
+.dialogo-cab span { flex: 1; color: var(--pbi-muted); font-size: 12px; }
+.dialogo-cab button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--pbi-grid);
+  border-radius: 6px;
+  background: var(--pbi-white);
+  color: var(--pbi-muted);
+  cursor: pointer;
+}
+.busca-interna {
+  width: 100%;
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--pbi-borda);
+  border-radius: 7px;
+  font-family: var(--font);
+  font-size: 13px;
+}
+.dialogo-lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  align-content: start;
+  gap: 1px 8px;
+  min-height: 120px;
+  overflow: auto;
+}

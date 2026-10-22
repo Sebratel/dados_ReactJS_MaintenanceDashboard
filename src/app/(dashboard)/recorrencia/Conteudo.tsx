@@ -7,6 +7,7 @@ import { useRecorrencia } from '@/lib/useIndicador'
 import { Painel } from '@/components/Painel'
 import { LinkHistorico } from '@/components/LinkHistorico'
 import { StatTile } from '@/components/kpi/StatTile'
+import { Kpis } from '@/components/kpi/Kpis'
 import { RankingSimples } from '@/components/charts/RankingSimples'
 import { fmtFracaoPct, fmtInt } from '@/lib/formato'
 
@@ -112,12 +113,8 @@ export function RecorrenciaConteudo() {
   const noUniverso = q.data?.meta.protocolosNoUniverso ?? 0
 
   return (
-    <div className="mx-auto flex max-w-[1600px] flex-col gap-4">
-      <p
-        className="rounded-md border px-3 py-2 text-xs text-[var(--text-secondary)]"
-        style={{ borderColor: 'var(--border)', background: 'var(--surface-1)' }}
-        role="note"
-      >
+    <div className="pagina com-kpis">
+      <p className="nota-tela" role="note">
         <strong>Recorrente</strong> = o login voltou a abrir chamado em{' '}
         <strong>até 30 dias</strong>. Isso vale para os três baldes; o que muda
         entre eles é <em>quantas janelas consecutivas</em> tiveram retorno —{' '}
@@ -131,11 +128,7 @@ export function RecorrenciaConteudo() {
         login entra uma vez por mês, pelo seu último protocolo não preventivo.
       </p>
 
-      <section
-        className="grid gap-3"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}
-        aria-label="Indicadores de recorrência"
-      >
+      <Kpis rotulo="Indicadores de recorrência">
         <StatTile
           rotulo="Taxa de recorrência"
           valor={q.isLoading ? '…' : fmtFracaoPct(t?.taxaRecorrencia, 1)}
@@ -186,10 +179,11 @@ export function RecorrenciaConteudo() {
           contexto="voltou nas três janelas — o mais grave"
           subirEhRuim
         />
-      </section>
+      </Kpis>
 
       <Painel
         titulo="Classificação de recorrência"
+        classe="v-grafico"
         descricao="Todas voltaram em até 30 dias. A classe diz até que janela a volta se repetiu — são exclusivas entre si."
         carregando={q.isLoading}
         erro={erro}
@@ -230,7 +224,6 @@ export function RecorrenciaConteudo() {
             }))}
             unidade="reparos-mês"
             escala="ordinal"
-            altura={150}
             aoClicar={(r) => {
               const cod = codigoDaClasse(r)
               if (cod) alternar('classeRec', cod)
@@ -240,12 +233,10 @@ export function RecorrenciaConteudo() {
         )}
       </Painel>
 
-      <div
-        className="grid gap-4"
-        style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)' }}
-      >
+      <div className="faixa dupla">
         <Painel
           titulo="Recorrência por cidade"
+          classe="v-tabela"
           descricao="Barra = logins crônicos. O tooltip traz o volume e a taxa."
           carregando={q.isLoading}
           erro={erro}
@@ -283,6 +274,7 @@ export function RecorrenciaConteudo() {
 
         <Painel
           titulo="Recorrência por catálogo"
+          classe="v-tabela"
           descricao="Barra = logins crônicos. Reparo × Tecnologia."
           carregando={q.isLoading}
           erro={erro}
@@ -347,6 +339,7 @@ export function RecorrenciaConteudo() {
       */}
       <Painel
         titulo="Recorrência por bairro"
+        classe="v-tabela"
         descricao="Barra = logins crônicos. O grão em que a operação age — cidade diz onde olhar, bairro diz onde ir."
         carregando={q.isLoading}
         erro={erro}
@@ -386,6 +379,7 @@ export function RecorrenciaConteudo() {
       {d && d.porMes.length > 1 && (
         <Painel
           titulo="Evolução mensal"
+          classe="v-grafico"
           descricao="Só aparece quando o recorte cobre mais de um mês"
           acoes={<LinkHistorico metrica="clientes" rotulo="% sobre a base" />}
           carregando={q.isLoading}

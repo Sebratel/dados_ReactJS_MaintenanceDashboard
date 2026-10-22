@@ -26,7 +26,7 @@ import type { PontoCoeficiente } from '@/server/indicadores/coeficiente'
  */
 export function CoeficienteVsMeta({
   dados,
-  altura = 240,
+  altura,
 }: {
   dados: PontoCoeficiente[]
   altura?: number

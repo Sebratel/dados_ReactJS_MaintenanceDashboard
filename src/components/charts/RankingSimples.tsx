@@ -177,11 +177,13 @@ export function RankingSimples({
     }
   }, [dados, ordenado, unidade, escala, selecionado, formatarValor])
 
-  const h = altura ?? Math.max(140, dados.length * 26 + 24)
+  // sem altura fixa preenche o card; ~18px por barra é o piso legível
+  const minima = Math.max(120, dados.length * 18 + 24)
   return (
     <Chart
       option={option}
-      altura={h}
+      altura={altura}
+      alturaMinima={minima}
       aria-label="Ranking por volume"
       aoClicar={
         aoClicar ? (i) => {

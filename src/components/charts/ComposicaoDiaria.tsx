@@ -30,7 +30,7 @@ import type { PontoProdutividadeDia } from '@/server/indicadores/produtividade'
  */
 export function ComposicaoDiaria({
   dados,
-  altura = 240,
+  altura,
 }: {
   dados: PontoProdutividadeDia[]
   altura?: number

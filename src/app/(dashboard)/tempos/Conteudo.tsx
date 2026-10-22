@@ -5,7 +5,9 @@ import { useSearchParams } from 'next/navigation'
 import { parsearFiltros } from '@/lib/filtros'
 import { useHeatmap, useKpis, useMtta, useRanking, useSerie } from '@/lib/useIndicador'
 import { Painel } from '@/components/Painel'
+import { Segmentado } from '@/components/Segmentado'
 import { StatTile } from '@/components/kpi/StatTile'
+import { Kpis } from '@/components/kpi/Kpis'
 import { SerieMttr } from '@/components/charts/SerieMttr'
 import { HeatmapDiaTurno, FAIXAS_MTTR } from '@/components/charts/HeatmapDiaTurno'
 import { RankingBarras } from '@/components/charts/RankingBarras'
@@ -41,22 +43,11 @@ function Bloco({
   children: ReactNode
 }) {
   return (
-    <section className="flex flex-col gap-3" aria-label={titulo}>
-      <div className="flex flex-col gap-0.5">
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-[13px] font-semibold tracking-[0.08em] text-[var(--text-primary)]">
-            {titulo}
-          </h2>
-          <span
-            className="rounded px-1.5 py-0.5 text-[10px] font-medium"
-            style={{ background: 'var(--surface-raised)', color: 'var(--text-secondary)' }}
-          >
-            por {eixo}
-          </span>
-        </div>
-        <p className="max-w-[92ch] text-[11px] leading-relaxed text-[var(--text-muted)]">
-          {explicacao}
-        </p>
+    <section className="coluna" aria-label={titulo}>
+      <div className="titulo-grupo">
+        <h2>{titulo}</h2>
+        <span className="etiqueta-eixo">por {eixo}</span>
+        <p>{explicacao}</p>
       </div>
       {children}
     </section>
@@ -66,7 +57,7 @@ function Bloco({
 /** Legenda das faixas do BI — sem ela a cor da célula é enfeite. */
 function LegendaFaixas() {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[var(--text-muted)]">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
       <span>Faixas do Power BI:</span>
       {FAIXAS_MTTR.map((f) => (
         <span key={f.label} className="flex items-center gap-1">
@@ -98,16 +89,13 @@ export function TemposConteudo() {
   const m = mtta.data?.data
 
   return (
-    <div className="mx-auto flex max-w-[1600px] flex-col gap-7">
+    <div className="pagina com-kpis">
       <Bloco
-        titulo="DESEMPENHO DA OPERAÇÃO"
+        titulo="Desempenho da operação"
         eixo="encerramento"
         explicacao="O reparo é contado no mês em que o cliente voltou a operar, não no de abertura. Um protocolo aberto em 31/07 e fechado em 02/08 é resultado de agosto — mesma regra do Power BI (USERELATIONSHIP com dataEncerrado), e é o que impede o número de um mês fechado continuar mudando semanas depois."
       >
-        <div
-          className="grid gap-3"
-          style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' }}
-        >
+        <Kpis rotulo="Indicadores de desempenho">
           <StatTile
             rotulo="MTTR — reparo total"
             valor={kpis.isLoading ? '…' : fmtHoras(k?.mttrHoras)}
@@ -139,10 +127,11 @@ export function TemposConteudo() {
                 : 'base do MTTR e do MTTA'
             }
           />
-        </div>
+        </Kpis>
 
         <Painel
           titulo="MTTR médio no tempo"
+          classe="v-grafico"
           descricao="Cada ponto é a média dos reparos encerrados naquele período. Linha tracejada marca a média do recorte."
           carregando={serie.isLoading}
           erro={serie.error ? String(serie.error.message) : null}
@@ -161,54 +150,35 @@ export function TemposConteudo() {
           }}
         >
           {serie.data && (
-            <SerieMttr dados={serie.data.data} granularidade={filtros.granularidade} altura={220} />
+            <SerieMttr dados={serie.data.data} granularidade={filtros.granularidade} />
           )}
         </Painel>
       </Bloco>
 
       <Bloco
-        titulo="CAPACIDADE DE ATENDIMENTO"
+        titulo="Capacidade de atendimento"
         eixo="abertura"
         explicacao="Reparo que ENTRA neste dia e nesta hora espera quanto. Sábado à noite espera até segunda — o que aparece aqui é escala e folga, na visão do cliente, e não lentidão da equipe. Os painéis abaixo classificam o protocolo pelo instante da abertura, mesmo que ele tenha sido encerrado em outro mês."
       >
-        <div
-          className="grid gap-4"
-          style={{ gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 1fr)' }}
-        >
+        {/* o mapa ocupa a área útil; os dois volumes dividem a mesma altura ao lado */}
+        <div className="faixa dupla">
           <Painel
             titulo="MTTR_A — dia da semana × turno"
+            classe="v-cheia"
             descricao="Cores nas faixas do Power BI. Substitui os pivots do Relatório Executivo."
             carregando={heat.isLoading}
             erro={heat.error ? String(heat.error.message) : null}
             nota={metrica === 'mttr' ? <LegendaFaixas /> : undefined}
             acoes={
-              <div
-                className="flex overflow-hidden rounded border text-[11px]"
-                style={{ borderColor: 'var(--border)' }}
-                role="group"
-                aria-label="métrica do heatmap"
-              >
-                {(
-                  [
-                    ['mttr', 'MTTR'],
-                    ['protocolos', 'Abertos'],
-                  ] as const
-                ).map(([id, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setMetrica(id)}
-                    aria-pressed={metrica === id}
-                    className={`px-2 py-1 transition-colors ${
-                      metrica === id
-                        ? 'bg-[var(--brand)] text-[var(--brand-ink)]'
-                        : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <Segmentado
+                rotulo="métrica do heatmap"
+                valor={metrica}
+                aoMudar={setMetrica}
+                opcoes={[
+                  { valor: 'mttr', rotulo: 'MTTR' },
+                  { valor: 'protocolos', rotulo: 'Abertos' },
+                ]}
+              />
             }
             tabela={{
               colunas: [
@@ -225,12 +195,13 @@ export function TemposConteudo() {
               })),
             }}
           >
-            {heat.data && <HeatmapDiaTurno dados={heat.data.data} metrica={metrica} altura={230} />}
+            {heat.data && <HeatmapDiaTurno dados={heat.data.data} metrica={metrica} />}
           </Painel>
 
-          <div className="flex flex-col gap-4">
+          <div className="coluna">
             <Painel
               titulo="Volume por turno"
+              classe="v-grafico"
               descricao="Ordem natural do dia — não ordenado por volume"
               carregando={porTurno.isLoading}
               erro={porTurno.error ? String(porTurno.error.message) : null}
@@ -250,12 +221,13 @@ export function TemposConteudo() {
               }}
             >
               {porTurno.data && (
-                <RankingBarras dados={porTurno.data.data} altura={130} escala="ordinal" />
+                <RankingBarras dados={porTurno.data.data} escala="ordinal" />
               )}
             </Painel>
 
             <Painel
               titulo="Volume por dia da semana"
+              classe="v-tabela"
               descricao="Domingo a sábado, na ordem da semana"
               carregando={porDia.isLoading}
               erro={porDia.error ? String(porDia.error.message) : null}
@@ -273,7 +245,7 @@ export function TemposConteudo() {
               }}
             >
               {porDia.data && (
-                <RankingBarras dados={porDia.data.data} altura={200} escala="ordinal" />
+                <RankingBarras dados={porDia.data.data} escala="ordinal" />
               )}
             </Painel>
           </div>

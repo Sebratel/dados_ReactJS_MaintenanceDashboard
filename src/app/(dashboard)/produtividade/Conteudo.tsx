@@ -5,7 +5,9 @@ import { useSearchParams } from 'next/navigation'
 import { parsearFiltros } from '@/lib/filtros'
 import { useProdutividade } from '@/lib/useIndicador'
 import { Painel } from '@/components/Painel'
+import { Segmentado } from '@/components/Segmentado'
 import { StatTile } from '@/components/kpi/StatTile'
+import { Kpis } from '@/components/kpi/Kpis'
 import { ComposicaoDiaria } from '@/components/charts/ComposicaoDiaria'
 import { SerieAssertividade } from '@/components/charts/SerieAssertividade'
 import { RankingComposto } from '@/components/charts/RankingComposto'
@@ -113,7 +115,7 @@ export function ProdutividadeConteudo() {
   const catalogosOcultos = (d?.porCatalogo ?? []).length - catalogos.length
 
   return (
-    <div className="mx-auto flex max-w-[1600px] flex-col gap-4">
+    <div className="pagina com-kpis">
       {/*
         Aviso necessário, não decorativo. A barra de filtros é global e mostra
         "Eixo da data" e "Granularidade" ativos, mas esta página não pode honrar
@@ -121,22 +123,14 @@ export function ProdutividadeConteudo() {
         leitor veria "Criação" selecionado e concluiria que o gráfico conta por
         data de criação — que é outro número.
       */}
-      <p
-        className="rounded-md border px-3 py-2 text-xs text-[var(--text-secondary)]"
-        style={{ borderColor: 'var(--border)', background: 'var(--surface-1)' }}
-        role="note"
-      >
+      <p className="nota-tela" role="note">
         <strong>Nesta página o período é sempre pelo dia agendado</strong> e a série é
         diária — a produtividade é medida por visita, não por protocolo, então os
         controles de <em>eixo da data</em> e <em>granularidade</em> não se aplicam aqui.
         Os demais filtros valem normalmente.
       </p>
 
-      <section
-        className="grid gap-3"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}
-        aria-label="Indicadores de produtividade de campo"
-      >
+      <Kpis rotulo="Indicadores de produtividade de campo">
         <StatTile
           rotulo="Assertividade de campo"
           valor={q.isLoading ? '…' : fmtFracaoPct(t?.assertividadeCampo, 1)}
@@ -207,19 +201,21 @@ export function ProdutividadeConteudo() {
               : undefined
           }
         />
-      </section>
+      </Kpis>
 
-      <h2 className="mt-1 text-[13px] font-semibold tracking-wide uppercase text-[var(--text-secondary)]">
-        Visão da empresa · visitas
-      </h2>
-      <p className="-mt-3 text-xs text-[var(--text-muted)]">
-        Grão: protocolo × dia agendado. Uma visita feita em dupla é <strong>uma</strong>{' '}
-        visita. É o total real da operação, e o único número desta página que pode ser
-        somado.
-      </p>
+      <div className="titulo-grupo">
+        <h2>Visão da empresa · visitas</h2>
+        <p>
+          Grão: protocolo × dia agendado. Uma visita feita em dupla é <strong>uma</strong>{' '}
+          visita. É o total real da operação, e o único número desta página que pode ser
+          somado.
+        </p>
+      </div>
 
+      {/* desfecho e assertividade empilhados: mesmo eixo X, escalas diferentes */}
       <Painel
         titulo="Desfecho das visitas por dia"
+        classe="v-grafico"
         descricao="Total da barra = visitas do dia. A fatia vermelha é o que se perdeu."
         carregando={q.isLoading}
         erro={erro}
@@ -243,11 +239,12 @@ export function ProdutividadeConteudo() {
           })),
         }}
       >
-        {d && <ComposicaoDiaria dados={d.porDia} altura={230} />}
+        {d && <ComposicaoDiaria dados={d.porDia} />}
       </Painel>
 
       <Painel
         titulo="Assertividade de campo por dia"
+        classe="v-tabela"
         descricao="Mesmo eixo X do painel acima — painel separado porque taxa e contagem não compartilham escala"
         carregando={q.isLoading}
         erro={erro}
@@ -264,13 +261,12 @@ export function ProdutividadeConteudo() {
           })),
         }}
       >
-        {d && <SerieAssertividade dados={d.porDia} altura={165} />}
+        {d && <SerieAssertividade dados={d.porDia} />}
       </Painel>
 
-      <h2 className="mt-3 text-[13px] font-semibold tracking-wide uppercase text-[var(--text-secondary)]">
-        Visão do técnico · produção individual
-      </h2>
-      <p className="-mt-3 text-xs text-[var(--text-muted)]">
+      <div className="titulo-grupo">
+        <h2>Visão do técnico · produção individual</h2>
+      <p>
         Grão: visita × pessoa creditada. <strong>Os dois da dupla contam 1</strong> —
         crédito integral, executor e auxiliar. O executor é{' '}
         <strong>quem foi naquele dia</strong>, não o responsável do protocolo: um
@@ -307,9 +303,11 @@ export function ProdutividadeConteudo() {
         número de atividades da operação. O total de cada técnico, esse sim, é o
         número dele.
       </p>
+      </div>
 
       <Painel
         titulo="Produção por técnico"
+        classe="v-cheia"
         /*
           O SUBTÍTULO PRECISA DIZER POR QUE A LISTA ESTÁ NESSA ORDEM.
           Relato da Manutenção em 16/10/2026: "o primeiro está ordenado do maior
@@ -340,75 +338,42 @@ export function ProdutividadeConteudo() {
           </>
         }
         acoes={
-          <div className="flex items-center gap-1">
-            <div
-              className="flex overflow-hidden rounded border text-[11px]"
-              style={{ borderColor: 'var(--border)' }}
-              role="group"
-              aria-label="abonar motivos que não são do técnico"
+          <>
+            <Segmentado
+              multiplo
+              rotulo="abonar motivos que não são do técnico"
+              prefixo="abonar"
+              valor={abonados}
+              aoMudar={(g) =>
+                setAbonados((prev) => {
+                  const novo = new Set(prev)
+                  if (novo.has(g)) novo.delete(g)
+                  else novo.add(g)
+                  return novo
+                })
+              }
+              opcoes={GRUPOS_ABONAVEIS.map((g) => ({ valor: g, rotulo: g }))}
+            />
+            <Segmentado
+              rotulo="ordenar técnicos por"
+              valor={ordem}
+              aoMudar={setOrdem}
+              opcoes={ORDENS.map((o) => ({ valor: o.id, rotulo: o.label }))}
+            />
+            <button
+              type="button"
+              onClick={() => setDecrescente((v) => !v)}
+              aria-pressed={!decrescente}
+              title={
+                decrescente
+                  ? 'Mostrando os maiores primeiro — clique para trazer os piores ao topo'
+                  : 'Mostrando os piores primeiro — clique para voltar aos maiores'
+              }
+              className="btn-cab"
             >
-              <span className="px-2 py-1 text-[var(--text-muted)]">abonar</span>
-              {GRUPOS_ABONAVEIS.map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  onClick={() =>
-                    setAbonados((prev) => {
-                      const novo = new Set(prev)
-                      if (novo.has(g)) novo.delete(g)
-                      else novo.add(g)
-                      return novo
-                    })
-                  }
-                  aria-pressed={abonados.has(g)}
-                  className={`border-l px-2 py-1 transition-colors ${
-                    abonados.has(g)
-                      ? 'bg-[var(--brand)] text-[var(--brand-ink)]'
-                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                  }`}
-                  style={{ borderColor: 'var(--border)' }}
-                >
-                  {g}
-                </button>
-              ))}
-            </div>
-          <div
-            className="flex overflow-hidden rounded border text-[11px]"
-            style={{ borderColor: 'var(--border)' }}
-            role="group"
-            aria-label="ordenar técnicos por"
-          >
-            {ORDENS.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                onClick={() => setOrdem(o.id)}
-                aria-pressed={ordem === o.id}
-                className={`px-2 py-1 transition-colors ${
-                  ordem === o.id
-                    ? 'bg-[var(--brand)] text-[var(--brand-ink)]'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => setDecrescente((v) => !v)}
-            aria-pressed={!decrescente}
-            title={
-              decrescente
-                ? 'Mostrando os maiores primeiro — clique para trazer os piores ao topo'
-                : 'Mostrando os piores primeiro — clique para voltar aos maiores'
-            }
-            className="rounded border px-2 py-1 text-[11px] transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            style={{ borderColor: 'var(--border)' }}
-          >
-            {decrescente ? '↓ maiores' : '↑ piores'}
-          </button>
-          </div>
+              {decrescente ? '↓ maiores' : '↑ piores'}
+            </button>
+          </>
         }
         tabela={{
           colunas: [
@@ -463,12 +428,10 @@ export function ProdutividadeConteudo() {
         )}
       </Painel>
 
-      <div
-        className="grid gap-4"
-        style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)' }}
-      >
+      <div className="faixa dupla">
         <Painel
           titulo="Motivos de improdutividade"
+          classe="v-meia"
           descricao="Código do relato do técnico, traduzido pelo catálogo"
           carregando={q.isLoading}
           erro={erro}
@@ -504,10 +467,10 @@ export function ProdutividadeConteudo() {
 
         <Painel
           titulo="Por base"
+          classe="v-meia"
           descricao="Base real da agenda de campo, incluindo a trilha"
           carregando={q.isLoading}
           erro={erro}
-          className="min-h-0"
           tabela={{
             colunas: [
               { chave: 'base', rotulo: 'Base' },
@@ -536,7 +499,6 @@ export function ProdutividadeConteudo() {
                 assertividadeCampo: b.assertividadeCampo,
               }))}
               rotuloEixo="Base"
-              altura={170}
             />
           )}
         </Painel>
@@ -544,6 +506,7 @@ export function ProdutividadeConteudo() {
 
       <Painel
         titulo="Por catálogo de serviço"
+        classe="v-grafico"
         descricao="Reparo × Tecnologia — este é o corte que realmente separa a operação de campo"
         carregando={q.isLoading}
         erro={erro}

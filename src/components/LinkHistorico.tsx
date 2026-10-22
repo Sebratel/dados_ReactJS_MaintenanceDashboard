@@ -43,8 +43,7 @@ export function LinkHistorico({
     <Link
       href={`/historico?${q.toString()}`}
       title="Abre a série mensal desta métrica sobre a base de clientes, com o recorte atual"
-      className="inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px] text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
-      style={{ borderColor: 'var(--border)' }}
+      className="btn-cab"
     >
       {rotulo}
       <Icone nome="externo" tamanho={11} />

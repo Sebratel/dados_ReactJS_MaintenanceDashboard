@@ -12,7 +12,9 @@ import {
 } from '@/lib/colunasProtocolo'
 import { fmtInt } from '@/lib/formato'
 import { StatTile } from '@/components/kpi/StatTile'
+import { Kpis } from '@/components/kpi/Kpis'
 import { Icone } from '@/components/Icone'
+import { Segmentado } from '@/components/Segmentado'
 
 const POR_PAGINA = 100
 
@@ -120,12 +122,8 @@ export function ProtocolosConteudo() {
   const fim = meta ? Math.min(meta.total, meta.pagina * meta.porPagina) : 0
 
   return (
-    <div className="mx-auto flex max-w-[1600px] flex-col gap-4">
-      <p
-        className="rounded-md border px-3 py-2 text-xs text-[var(--text-secondary)]"
-        style={{ borderColor: 'var(--border)', background: 'var(--surface-1)' }}
-        role="note"
-      >
+    <div className="pagina com-kpis">
+      <p className="nota-tela" role="note">
         Esta é a <strong>lista nominal por trás dos números</strong> das outras páginas —
         mesmo universo, mesmos filtros, um protocolo por linha. O conjunto{' '}
         <strong>Voalle</strong> reproduz as colunas do export do ERP para conferência
@@ -134,11 +132,7 @@ export function ProtocolosConteudo() {
         divergência de fato aparece.
       </p>
 
-      <section
-        className="grid gap-3"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}
-        aria-label="Resumo do recorte"
-      >
+      <Kpis rotulo="Resumo do recorte">
         <StatTile
           rotulo="Protocolos no recorte"
           valor={q.isLoading ? '…' : fmtInt(meta?.totalRecorte)}
@@ -170,7 +164,7 @@ export function ProtocolosConteudo() {
                 : 'consultado no ERP agora'
           }
         />
-      </section>
+      </Kpis>
 
       {/* OS DOIS CORTES DE RECORRENCIA.
           Vivem aqui, e nao na barra global, porque so esta tela tem as colunas
@@ -195,92 +189,72 @@ export function ProtocolosConteudo() {
         />
       </div>
 
-      <section
-        className="flex flex-col rounded-lg border bg-[var(--surface-1)]"
-        style={{ borderColor: 'var(--border)' }}
-      >
-        <header className="flex flex-wrap items-center gap-2 px-4 pt-3.5 pb-2.5">
-          <h2 className="mr-auto text-[13px] font-semibold tracking-wide uppercase text-[var(--text-secondary)]">
-            Protocolos
-          </h2>
+      {/* A grade ocupa a área útil (`v-cheia`) e rola por dentro: com 100
+          linhas por página, deixá-la crescer empurraria a paginação e as
+          ressalvas do rodapé para fora da tela. */}
+      <section className="visual v-cheia" aria-label="Protocolos">
+        <div className="visual-cab">
+          <h2>Protocolos</h2>
+          <div className="acoes">
+            <label>
+              <span className="sr-only">Buscar</span>
+              <input
+                type="search"
+                value={buscaBruta}
+                onChange={(e) => setBuscaBruta(e.target.value)}
+                placeholder="protocolo, contrato, etiqueta, login, CTO…"
+                className="busca-cab"
+              />
+            </label>
 
-          <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
-            <span className="sr-only">Buscar</span>
-            <input
-              type="search"
-              value={buscaBruta}
-              onChange={(e) => setBuscaBruta(e.target.value)}
-              placeholder="protocolo, contrato, etiqueta, login, CTO…"
-              className="w-64 rounded border bg-transparent px-2 py-1 text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--brand)]"
-              style={{ borderColor: 'var(--border)' }}
+            <Segmentado
+              rotulo="conjunto de colunas"
+              valor={conjunto}
+              aoMudar={setConjunto}
+              opcoes={(Object.keys(CONJUNTOS) as NomeConjunto[]).map((k) => ({
+                valor: k,
+                rotulo: CONJUNTOS[k].rotulo,
+                dica: CONJUNTOS[k].ajuda,
+              }))}
             />
-          </label>
 
-          <div
-            className="flex overflow-hidden rounded border text-[11px]"
-            style={{ borderColor: 'var(--border)' }}
-            role="group"
-            aria-label="conjunto de colunas"
-          >
-            {(Object.keys(CONJUNTOS) as NomeConjunto[]).map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setConjunto(k)}
-                aria-pressed={conjunto === k}
-                title={CONJUNTOS[k].ajuda}
-                className={`px-2 py-1 transition-colors ${
-                  conjunto === k
-                    ? 'bg-[var(--brand)] text-[var(--brand-ink)]'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                {CONJUNTOS[k].rotulo}
-              </button>
-            ))}
+            <a
+              href={urlCsv}
+              className="btn-cab"
+              title="Baixa TODAS as linhas do recorte (não só a página), com o rodapé de filtros"
+            >
+              <Icone nome="baixar" tamanho={11} />
+              Exportar CSV
+            </a>
           </div>
+        </div>
 
-          <a
-            href={urlCsv}
-            className="rounded border px-2 py-1 text-[11px] text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
-            style={{ borderColor: 'var(--border)' }}
-            title="Baixa TODAS as linhas do recorte (não só a página), com o rodapé de filtros"
-          >
-            Exportar CSV
-          </a>
-        </header>
+        <div className="visual-corpo">
 
         {erro ? (
-          <div className="flex min-h-[240px] items-center justify-center px-4">
-            <p className="inline-flex items-center gap-1.5 text-center text-sm text-[var(--status-critical)]">
+          <div className="estado erro" role="alert">
+            <span className="linha">
               <Icone nome="alerta" tamanho={14} />
               {erro}
-            </p>
+            </span>
           </div>
         ) : q.isLoading ? (
-          <div className="flex min-h-[240px] items-center justify-center">
-            <span className="text-xs text-[var(--text-muted)]">
-              montando o relatório… (a primeira carga do recorte consulta o ERP)
-            </span>
+          <div className="estado" role="status">
+            <div className="carregando-barra" />
+            montando o relatório… (a primeira carga do recorte consulta o ERP)
           </div>
         ) : linhas.length === 0 ? (
-          <div className="flex min-h-[240px] items-center justify-center">
-            <span className="text-xs text-[var(--text-muted)]">
-              nenhum protocolo neste recorte
-            </span>
-          </div>
+          <div className="estado">nenhum protocolo neste recorte</div>
         ) : (
-          <div className="overflow-auto" style={{ maxHeight: '62vh' }}>
-            <table className="tabular w-full text-[11px]" style={{ minWidth: 'max-content' }}>
-              <thead className="sticky top-0 z-10 bg-[var(--surface-1)]">
-                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+          <div className="tabela-caixa">
+            <table className="tabela" style={{ minWidth: 'max-content', fontSize: 11 }}>
+              <thead>
+                <tr>
                   {colunas.map((c) => (
                     <th
                       key={c.chave}
                       scope="col"
-                      className={`whitespace-nowrap px-2 py-1.5 font-medium text-[var(--text-secondary)] ${
-                        c.alinhar === 'dir' ? 'text-right' : 'text-left'
-                      }`}
+                      className={c.alinhar === 'dir' ? '' : 'texto'}
                       style={{ minWidth: c.largura }}
                     >
                       {c.rotulo}
@@ -290,20 +264,15 @@ export function ProtocolosConteudo() {
               </thead>
               <tbody>
                 {linhas.map((l) => (
-                  <tr
-                    key={l.protocolo}
-                    style={{ borderBottom: '1px solid var(--border)' }}
-                    className="hover:bg-[var(--surface-raised)]"
-                  >
+                  <tr key={l.protocolo}>
                     {colunas.map((c) => {
                       const v = valorCelula(l, c.chave)
                       return (
                         <td
                           key={c.chave}
                           title={typeof v === 'string' && v.length > 24 ? v : undefined}
-                          className={`max-w-[320px] truncate px-2 py-1 text-[var(--text-primary)] ${
-                            c.alinhar === 'dir' ? 'text-right' : 'text-left'
-                          }`}
+                          className={`max-w-[320px] truncate ${c.alinhar === 'dir' ? '' : 'texto'}`}
+                          style={{ whiteSpace: 'nowrap' }}
                         >
                           {v === '' ? (
                             <span className="text-[var(--text-muted)]">—</span>
@@ -319,11 +288,9 @@ export function ProtocolosConteudo() {
             </table>
           </div>
         )}
+        </div>
 
-        <footer
-          className="flex flex-wrap items-center gap-3 px-4 pt-2 pb-2.5 text-[11px] text-[var(--text-muted)]"
-          style={{ borderTop: '1px solid var(--border)' }}
-        >
+        <footer className="visual-nota flex flex-wrap items-center gap-3">
           {meta && meta.total > 0 && (
             <span className="tabular-nums">
               {fmtInt(inicio)}–{fmtInt(fim)} de {fmtInt(meta.total)}
@@ -411,7 +378,8 @@ function CorteRecorrencia({
   return (
     <div className="flex flex-wrap items-center gap-2" role="group" aria-label={aria}>
       <span className="text-[var(--text-muted)]">{rotulo}</span>
-      <div className="flex overflow-hidden rounded border" style={{ borderColor: 'var(--border)' }}>
+      {/* fora da barra vinho, em fundo claro: a mesma peça `.seg` do card */}
+      <div className="seg claro">
         {opcoes.map((o) => (
           <button
             key={o.id ?? 'todos'}
@@ -419,11 +387,6 @@ function CorteRecorrencia({
             onClick={() => onChange(o.id)}
             aria-pressed={valor === o.id}
             title={o.ajuda}
-            className={`px-2 py-1 transition-colors ${
-              valor === o.id
-                ? 'bg-[var(--brand)] text-[var(--brand-ink)]'
-                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-            }`}
           >
             {o.rotulo}
           </button>
