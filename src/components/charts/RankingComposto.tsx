@@ -10,7 +10,7 @@ import {
   baseGrid,
   baseTooltip,
 } from '@/lib/tema'
-import { fmtFracaoPct, fmtInt } from '@/lib/formato'
+import { fmtFracaoPct, fmtInt, semEmoji } from '@/lib/formato'
 
 export type ItemComposto = {
   rotulo: string
@@ -117,7 +117,7 @@ export function RankingComposto({
           if (!d) return ''
           const linha = (rot: string, v: number, cor: string) =>
             `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${cor};margin-right:6px"></span>${rot} <b>${fmtInt(v)}</b>`
-          return `<b>${d.rotulo}</b><br/>
+          return `<b>${semEmoji(d.rotulo)}</b><br/>
             ${linha('Produtivo', d.produtivo, tk.statusGood)}<br/>
             ${linha('Improdutivo', d.improdutivo, tk.statusCritical)}<br/>
             ${linha('Sem ação', d.semAcao, tk.statusWarning)}<br/>
@@ -137,7 +137,7 @@ export function RankingComposto({
       },
       xAxis: baseEixoValor(tk, { splitLine: { show: false } }),
       yAxis: baseEixoCategoria(tk, {
-        data: ordenado.map((d) => d.rotulo),
+        data: ordenado.map((d) => semEmoji(d.rotulo)),
         name: rotuloEixo,
         nameGap: 8,
         nameTextStyle: { color: tk.textMuted, fontSize: 0 },

@@ -11,7 +11,7 @@ import {
   baseTooltip,
 } from '@/lib/tema'
 
-import { fmtFracaoPct, fmtInt } from '@/lib/formato'
+import { fmtFracaoPct, fmtInt, semEmoji } from '@/lib/formato'
 
 export type ItemSimples = {
   rotulo: string
@@ -112,7 +112,7 @@ export function RankingSimples({
         formatter: (p: { dataIndex: number }) => {
           const d = ordenado[p.dataIndex]
           if (!d) return ''
-          return `<b>${d.rotulo}</b><br/>
+          return `<b>${semEmoji(d.rotulo)}</b><br/>
             ${formatarValor(d.valor)} ${unidade}${
               d.share !== undefined ? ` (${fmtFracaoPct(d.share, 1)} do total)` : ''
             }${d.detalhe ? `<br/><span style="color:${tk.textMuted}">${d.detalhe}</span>` : ''}`
@@ -124,7 +124,7 @@ export function RankingSimples({
         axisLabel: { color: tk.textMuted, fontSize: 11, formatter: (v: number) => formatarValor(v) },
       }),
       yAxis: baseEixoCategoria(tk, {
-        data: ordenado.map((d) => d.rotulo),
+        data: ordenado.map((d) => semEmoji(d.rotulo)),
         axisLine: { show: false },
         axisLabel: {
           color: tk.textSecondary,

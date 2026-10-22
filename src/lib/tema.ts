@@ -21,6 +21,8 @@ export type TokensTema = {
   seq: string[]
   ord: string[]
   brand: string
+  /** base do gradiente das colunas (o topo é `series[0]`) */
+  serieClara: string
 }
 
 const FALLBACK: TokensTema = {
@@ -38,6 +40,7 @@ const FALLBACK: TokensTema = {
   seq: ['#fbf6de', '#f6ecba', '#f0e199', '#e8d166', '#e0c233', '#d9b300', '#9a7f00'],
   ord: ['#f0e199', '#d9b300', '#9a7f00'],
   brand: '#880f17',
+  serieClara: '#f0e199',
 }
 
 export function lerTokens(): TokensTema {
@@ -58,6 +61,27 @@ export function lerTokens(): TokensTema {
     seq: [100, 200, 300, 400, 500, 600, 700].map((s, i) => v(`--seq-${s}`, FALLBACK.seq[i]!)),
     ord: [1, 2, 3].map((i) => v(`--ord-${i}`, FALLBACK.ord[i - 1]!)),
     brand: v('--brand', FALLBACK.brand),
+    serieClara: v('--pbi-gold-light', FALLBACK.serieClara),
+  }
+}
+
+/**
+ * Preenchimento das colunas da série principal: dourado no topo, dourado claro
+ * na base — o mesmo das colunas do COM · Gestão Comercial e do Power BI de
+ * origem. Gradiente só na série principal; as demais ficam lisas para a
+ * identidade continuar sendo a cor, não o efeito.
+ */
+export function gradienteColuna(tk: TokensTema) {
+  return {
+    type: 'linear' as const,
+    x: 0,
+    y: 0,
+    x2: 0,
+    y2: 1,
+    colorStops: [
+      { offset: 0, color: tk.series[0]! },
+      { offset: 1, color: tk.serieClara },
+    ],
   }
 }
 
@@ -100,7 +124,9 @@ export function baseEixoValor(tk: TokensTema, extra?: Record<string, unknown>) {
     type: 'value' as const,
     axisLine: { show: false },
     axisTick: { show: false },
-    splitLine: { lineStyle: { color: tk.gridline, width: 1 } },
+    // grade recessiva da skill: só horizontal, na cor de grade, tracejada 4/4 —
+    // ela orienta a leitura sem competir com o dado
+    splitLine: { lineStyle: { color: tk.gridline, width: 1, type: [4, 4] } },
     axisLabel: { color: tk.textMuted, fontSize: 11 },
     ...extra,
   }

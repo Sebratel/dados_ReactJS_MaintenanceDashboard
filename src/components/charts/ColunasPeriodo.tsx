@@ -8,6 +8,7 @@ import {
   baseEixoValor,
   baseGrid,
   baseTooltip,
+  gradienteColuna,
   rotuloValor,
 } from '@/lib/tema'
 import { fmtInt, fmtPeriodo } from '@/lib/formato'
@@ -76,7 +77,7 @@ export function ColunasPeriodo({
           type: 'bar' as const,
           data: dados.map((d) => d.valor),
           itemStyle: {
-            color: tk.series[0],
+            color: gradienteColuna(tk),
             borderRadius: [3, 3, 0, 0] as [number, number, number, number],
           },
           barMaxWidth: 46,

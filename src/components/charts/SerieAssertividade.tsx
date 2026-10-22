@@ -88,9 +88,11 @@ export function SerieAssertividade({
           symbol: 'circle',
           symbolSize: MARCA.tamanhoMarcador,
           showSymbol: dados.length <= 40,
-          lineStyle: { color: tk.series[0], width: MARCA.larguraLinha },
-          itemStyle: { color: tk.series[0] },
-          areaStyle: { color: `${tk.series[0]}14` },
+          // linha na SEGUNDA cor (laranja): o dourado é da coluna, e linha
+          // dourada fina sobre branco quase some (contraste ~2:1)
+          lineStyle: { color: tk.series[1], width: MARCA.larguraLinha },
+          itemStyle: { color: tk.series[1] },
+          areaStyle: { color: `${tk.series[1]}14` },
           // Série única, mesma justificativa de SerieMttr. Sem casa decimal:
           // "96%" ocupa metade de "96,4%", e a variação que interessa no painel
           // é de pontos inteiros -- a decimal fica no tooltip.

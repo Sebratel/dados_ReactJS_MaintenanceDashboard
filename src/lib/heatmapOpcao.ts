@@ -134,8 +134,10 @@ export function montarOpcaoHeatmap({
     if (ehMttr) {
       return { value: p, label: { color: v === null ? tk.textMuted : faixaMttr(v).tinta } }
     }
-    const intenso = max > 0 && (v ?? 0) / max > 0.5
-    return { value: p, label: { color: intenso ? '#ffffff' : tk.textPrimary } }
+    // A rampa de contagem é dourada (claro → escuro) desde a paleta da origem,
+    // e branco sobre dourado fica ilegível já no meio da escala. A tinta
+    // grafite lê em todos os tons, do mais claro ao mais escuro (~4:1).
+    return { value: p, label: { color: tk.textPrimary } }
   })
 
   const visualMap = ehMttr

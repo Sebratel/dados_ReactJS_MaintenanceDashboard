@@ -9,6 +9,7 @@ import {
   baseEixoValor,
   baseGrid,
   baseTooltip,
+  gradienteColuna,
   rotuloValor,
 } from '@/lib/tema'
 import { fmtFracaoPct, fmtInt } from '@/lib/formato'
@@ -99,7 +100,7 @@ export function VolumeComCoeficiente({
           type: 'bar' as const,
           yAxisIndex: 0,
           data: dados.map((d) => d.volume),
-          itemStyle: { color: tk.series[0], borderRadius: MARCA.barraTopo4px },
+          itemStyle: { color: gradienteColuna(tk), borderRadius: MARCA.barraTopo4px },
           /*
             RÓTULO DENTRO DA BARRA, e não em cima dela.
             Com eixo duplo, a linha passa perto do topo das barras em escalas
@@ -107,15 +108,13 @@ export function VolumeComCoeficiente({
             ("2,76%" cobrindo "2.359"). Dentro da barra eles ficam separados
             por construção, em qualquer escala.
 
-            `tk.surface` como cor do texto é o truque que funciona nos dois
-            temas: a barra usa a cor da série, e a superfície é sempre o
-            oposto dela em luminância — escura atrás de barra clara, clara
-            atrás de barra saturada.
+            Texto na cor de tinta, não branco: a coluna agora é dourada, e
+            branco sobre dourado fica em ~2:1 de contraste — o número sumia.
           */
           ...rotuloValor({
             n,
             formatter: (p) => fmtInt(p.value),
-            cor: tk.surface,
+            cor: tk.textPrimary,
             position: 'insideTop',
             distancia: 6,
           }),
@@ -128,13 +127,16 @@ export function VolumeComCoeficiente({
           // leria como "não houve reparo", e o que houve foi falta de medição
           connectNulls: false,
           data: dados.map((d) => d.coeficiente),
-          lineStyle: { width: MARCA.larguraLinha, color: tk.statusCritical },
-          itemStyle: { color: tk.statusCritical },
+          // segunda cor de série (laranja), não o vermelho de "crítico": cor de
+          // estado é reservada, e uma linha vermelha leria como alarme o mês todo.
+          // O rótulo vai na tinta — texto nunca na cor da série (skill, seção 1).
+          lineStyle: { width: MARCA.larguraLinha, color: tk.series[1] },
+          itemStyle: { color: tk.series[1] },
           symbolSize: MARCA.tamanhoMarcador,
           ...rotuloValor({
             n,
             formatter: (p) => (p.value === null ? '' : fmtFracaoPct(p.value, 2)),
-            cor: tk.statusCritical,
+            cor: tk.textPrimary,
             distancia: 8,
           }),
         },

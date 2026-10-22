@@ -2,7 +2,15 @@
 
 import { useMemo } from 'react'
 import { Chart } from './Chart'
-import { lerTokens, MARCA, baseEixoCategoria, baseEixoValor, baseGrid, baseTooltip } from '@/lib/tema'
+import {
+  lerTokens,
+  MARCA,
+  baseEixoCategoria,
+  baseEixoValor,
+  baseGrid,
+  baseTooltip,
+  gradienteColuna,
+} from '@/lib/tema'
 import { fmtInt, fmtPeriodo } from '@/lib/formato'
 import type { PontoSerie } from '@/server/indicadores/serie'
 import type { Granularidade } from '@/lib/filtros'
@@ -193,7 +201,7 @@ export function SerieTemporal({
           type: 'bar',
           yAxisIndex: 0,
           data: dados.map((d) => d.abertos),
-          itemStyle: { color: tk.series[0], borderRadius: MARCA.barraTopo4px },
+          itemStyle: { color: gradienteColuna(tk), borderRadius: MARCA.barraTopo4px },
           emphasis: { focus: 'series' as const },
         },
         {

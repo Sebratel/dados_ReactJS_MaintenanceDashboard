@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { baixarCsv, copiar, nomeDeArquivo, paraCsv, paraTsv } from '@/lib/exportar'
+import { semEmoji } from '@/lib/formato'
 import { ExplicarIA } from './ExplicarIA'
 import { Icone } from './Icone'
 import { Segmentado } from './Segmentado'
@@ -201,11 +202,16 @@ export function Painel({
               <tbody>
                 {tabela.linhas.map((l, i) => (
                   <tr key={i}>
-                    {tabela.colunas.map((c) => (
-                      <td key={c.chave} className={c.alinhar === 'dir' ? '' : 'texto'}>
-                        {l[c.chave] ?? '—'}
-                      </td>
-                    ))}
+                    {tabela.colunas.map((c) => {
+                      const v = l[c.chave]
+                      // emoji do banco (o ✅ das bases) sai só da TELA: Copiar e
+                      // CSV levam o valor cru, que é o que bate com o Voalle
+                      return (
+                        <td key={c.chave} className={c.alinhar === 'dir' ? '' : 'texto'}>
+                          {v === undefined || v === null ? '—' : typeof v === 'string' ? semEmoji(v) : v}
+                        </td>
+                      )
+                    })}
                   </tr>
                 ))}
               </tbody>
