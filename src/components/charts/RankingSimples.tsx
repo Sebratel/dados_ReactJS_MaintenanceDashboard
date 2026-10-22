@@ -11,7 +11,6 @@ import {
   baseTooltip,
 } from '@/lib/tema'
 
-import { useTemaAtual } from '@/lib/useTema'
 import { fmtFracaoPct, fmtInt } from '@/lib/formato'
 
 export type ItemSimples = {
@@ -83,8 +82,6 @@ export function RankingSimples({
   // fora do useMemo: o handler de clique precisa da MESMA ordem que as barras
   const ordenado = useMemo(() => [...dados].reverse(), [dados])
 
-  // o memo abaixo lê as variáveis CSS do tema — ver useTema.ts
-  const tema = useTemaAtual()
 
   const option = useMemo(() => {
     const tk = lerTokens()
@@ -178,7 +175,7 @@ export function RankingSimples({
         },
       ],
     }
-  }, [dados, ordenado, unidade, escala, selecionado, formatarValor, tema])
+  }, [dados, ordenado, unidade, escala, selecionado, formatarValor])
 
   const h = altura ?? Math.max(140, dados.length * 26 + 24)
   return (

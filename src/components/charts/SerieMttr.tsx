@@ -11,7 +11,6 @@ import {
   baseTooltip,
   rotuloValor,
 } from '@/lib/tema'
-import { useTemaAtual } from '@/lib/useTema'
 import { fmtHoras, fmtHorasCurto, fmtPeriodo } from '@/lib/formato'
 import type { PontoSerie } from '@/server/indicadores/serie'
 import type { Granularidade } from '@/lib/filtros'
@@ -32,8 +31,6 @@ export function SerieMttr({
   granularidade: Granularidade
   altura?: number
 }) {
-  // o memo abaixo lê as variáveis CSS do tema — ver useTema.ts
-  const tema = useTemaAtual()
 
   const option = useMemo(() => {
     const tk = lerTokens()
@@ -136,7 +133,7 @@ export function SerieMttr({
         },
       ],
     }
-  }, [dados, granularidade, tema])
+  }, [dados, granularidade])
 
   return <Chart option={option} altura={altura} aria-label="MTTR médio ao longo do tempo" />
 }

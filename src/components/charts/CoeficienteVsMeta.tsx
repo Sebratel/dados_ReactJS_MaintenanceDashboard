@@ -11,7 +11,6 @@ import {
   baseTooltip,
   rotuloValor,
 } from '@/lib/tema'
-import { useTemaAtual } from '@/lib/useTema'
 import { fmtFracaoPct, fmtInt, fmtDiaCurto, fmtData } from '@/lib/formato'
 import type { PontoCoeficiente } from '@/server/indicadores/coeficiente'
 
@@ -32,8 +31,6 @@ export function CoeficienteVsMeta({
   dados: PontoCoeficiente[]
   altura?: number
 }) {
-  // o memo abaixo lê as variáveis CSS do tema — ver useTema.ts
-  const tema = useTemaAtual()
 
   const option = useMemo(() => {
     const tk = lerTokens()
@@ -55,7 +52,7 @@ export function CoeficienteVsMeta({
             Meta do dia <b>${fmtFracaoPct(d.meta, 3)}</b><br/>
             Reparos <b>${fmtInt(d.reparos)}</b><br/>
             Base de clientes <b>${fmtInt(d.baseClientes)}</b>
-            ${d.interpolado ? `<br/><span style="color:${tk.statusWarning}">⚠ base estimada (sem snapshot no dia)</span>` : ''}`
+            ${d.interpolado ? `<br/><span style="color:${tk.statusWarning}"><b>Atenção:</b> base estimada (sem snapshot no dia)</span>` : ''}`
         },
       }),
       xAxis: baseEixoCategoria(tk, {
@@ -140,7 +137,7 @@ export function CoeficienteVsMeta({
         data: ['Coeficiente', 'Meta'],
       },
     }
-  }, [dados, tema])
+  }, [dados])
 
   return <Chart option={option} altura={altura} aria-label="Coeficiente de reparos sobre a base de clientes, comparado à meta diária" />
 }

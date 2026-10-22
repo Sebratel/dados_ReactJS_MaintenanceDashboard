@@ -11,7 +11,6 @@ import {
   baseTooltip,
   rotuloValor,
 } from '@/lib/tema'
-import { useTemaAtual } from '@/lib/useTema'
 import { fmtFracaoPct, fmtInt } from '@/lib/formato'
 
 export type PontoVolumeCoef = {
@@ -47,8 +46,6 @@ export function VolumeComCoeficiente({
   altura?: number
   rotuloVolume?: string
 }) {
-  // o memo abaixo lê as variáveis CSS do tema — ver useTema.ts
-  const tema = useTemaAtual()
 
   const option = useMemo(() => {
     const tk = lerTokens()
@@ -143,7 +140,7 @@ export function VolumeComCoeficiente({
         },
       ],
     }
-  }, [dados, rotuloVolume, tema])
+  }, [dados, rotuloVolume])
 
   return (
     <Chart

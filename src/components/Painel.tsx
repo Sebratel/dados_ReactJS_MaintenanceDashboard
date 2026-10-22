@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { baixarCsv, copiar, nomeDeArquivo, paraCsv, paraTsv } from '@/lib/exportar'
 import { ExplicarIA } from './ExplicarIA'
+import { Icone } from './Icone'
 
 export type ColunaTabela = { chave: string; rotulo: string; alinhar?: 'esq' | 'dir' }
 
@@ -169,8 +170,8 @@ export function Painel({
       <div className="relative min-h-0 flex-1 px-2 pb-3">
         {erro ? (
           <div className="flex h-full min-h-[200px] items-center justify-center px-4">
-            <p className="text-center text-sm text-[var(--status-critical)]">
-              <span aria-hidden="true">⚠ </span>
+            <p className="inline-flex items-center gap-1.5 text-center text-sm text-[var(--status-critical)]">
+              <Icone nome="alerta" tamanho={14} />
               {erro}
             </p>
           </div>

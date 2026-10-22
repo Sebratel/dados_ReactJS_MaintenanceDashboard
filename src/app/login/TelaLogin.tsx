@@ -194,7 +194,7 @@ export function TelaLogin({
         <section className={css.marca}>
           <div className={css.marcaTopo}>
             {/* mesmo arquivo do cabeçalho e do Data Hub — PNG RGBA */}
-            <img src="/logo-sebratel.png" alt="" width={46} height={46} />
+            <img src="/logo-circular-sebratel.png" alt="" width={46} height={46} />
             <span>Operação Sebratel</span>
           </div>
           <h2>

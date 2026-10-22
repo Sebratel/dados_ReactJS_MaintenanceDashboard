@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { parsearFiltros } from '@/lib/filtros'
 import { useOfensores } from '@/lib/useIndicador'
+import { Icone } from '@/components/Icone'
 import { Painel } from '@/components/Painel'
 import { StatTile } from '@/components/kpi/StatTile'
 import { RankingSimples } from '@/components/charts/RankingSimples'
@@ -136,18 +137,20 @@ export function OfensoresConteudo() {
           <button
             type="button"
             onClick={() => alternarOfensor(ofensor)}
-            className="rounded border px-2 py-0.5 text-[11px] text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+            className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
             style={{ borderColor: 'var(--border)' }}
           >
-            limpar ✕
+            limpar
+            <Icone nome="fechar" tamanho={11} />
           </button>
           <Link
             href={linkProtocolos}
             title="Abre a lista nominal com o mesmo recorte — é onde se confere protocolo a protocolo"
-            className="ml-auto rounded border px-2 py-0.5 text-[11px] text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+            className="ml-auto inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
             style={{ borderColor: 'var(--border)' }}
           >
-            ver os protocolos ↗
+            ver os protocolos
+            <Icone nome="externo" tamanho={11} />
           </Link>
         </div>
       )}

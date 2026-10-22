@@ -11,6 +11,7 @@ import {
   useRanking,
   useSerie,
 } from '@/lib/useIndicador'
+import { Icone } from '@/components/Icone'
 import { Painel } from '@/components/Painel'
 import { LinkHistorico } from '@/components/LinkHistorico'
 import { StatTile } from '@/components/kpi/StatTile'
@@ -267,8 +268,12 @@ export function VisaoExecutivaConteudo() {
               {coef.data.meta.diasInterpolados > 0 && (
                 <>
                   {' · '}
-                  <span style={{ color: 'var(--status-warning)' }}>
-                    ⚠ {coef.data.meta.diasInterpolados}{' '}
+                  <span
+                    className="inline-flex items-center gap-1"
+                    style={{ color: 'var(--status-warning)' }}
+                  >
+                    <Icone nome="alerta" tamanho={12} />
+                    {coef.data.meta.diasInterpolados}{' '}
                     {coef.data.meta.diasInterpolados === 1 ? 'dia' : 'dias'} com base estimada
                     (sem snapshot) — barra tracejada
                   </span>

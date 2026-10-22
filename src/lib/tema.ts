@@ -2,8 +2,9 @@
  * Ponte entre os design tokens (CSS custom properties) e o ECharts.
  *
  * O tema default do ECharts é descartado inteiro: as cores vêm dos tokens em
- * globals.css, lidos do DOM. Assim a troca light/dark acontece em um lugar só e
- * a paleta validada não é duplicada em JS.
+ * globals.css, lidos do DOM. A paleta mora num lugar só; o FALLBACK abaixo é o
+ * espelho dela para quando não há DOM (renderização no servidor) e precisa
+ * acompanhar qualquer troca feita lá.
  */
 
 export type TokensTema = {
@@ -23,19 +24,20 @@ export type TokensTema = {
 }
 
 const FALLBACK: TokensTema = {
-  surface: '#fcfcfb',
-  textPrimary: '#0b0b0b',
-  textSecondary: '#52514e',
-  textMuted: '#898781',
-  gridline: '#e1e0d9',
-  axis: '#c3c2b7',
-  series: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7'],
-  statusGood: '#0ca30c',
-  statusWarning: '#fab219',
-  statusCritical: '#d03b3b',
-  seq: ['#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#184f95', '#0d366b'],
-  ord: ['#86b6ef', '#2a78d6', '#184f95'],
-  brand: '#d80010',
+  surface: '#ffffff',
+  textPrimary: '#252423',
+  textSecondary: '#3b3a39',
+  textMuted: '#605e5c',
+  gridline: '#e1dfdd',
+  axis: '#c8c6c4',
+  // identidade das séries, na ordem fixa da skill: gold → orange → ink
+  series: ['#d9b300', '#e66c37', '#252423'],
+  statusGood: '#0e9224',
+  statusWarning: '#d49f00',
+  statusCritical: '#b3261e',
+  seq: ['#fbf6de', '#f6ecba', '#f0e199', '#e8d166', '#e0c233', '#d9b300', '#9a7f00'],
+  ord: ['#f0e199', '#d9b300', '#9a7f00'],
+  brand: '#880f17',
 }
 
 export function lerTokens(): TokensTema {
@@ -49,7 +51,7 @@ export function lerTokens(): TokensTema {
     textMuted: v('--text-muted', FALLBACK.textMuted),
     gridline: v('--gridline', FALLBACK.gridline),
     axis: v('--axis', FALLBACK.axis),
-    series: [1, 2, 3, 4, 5, 6, 7].map((i) => v(`--series-${i}`, FALLBACK.series[i - 1]!)),
+    series: [1, 2, 3].map((i) => v(`--series-${i}`, FALLBACK.series[i - 1]!)),
     statusGood: v('--status-good', FALLBACK.statusGood),
     statusWarning: v('--status-warning', FALLBACK.statusWarning),
     statusCritical: v('--status-critical', FALLBACK.statusCritical),

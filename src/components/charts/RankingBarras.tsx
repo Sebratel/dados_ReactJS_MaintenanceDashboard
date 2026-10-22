@@ -3,7 +3,6 @@
 import { useMemo } from 'react'
 import { Chart } from './Chart'
 import { lerTokens, MARCA, baseEixoCategoria, baseEixoValor, baseGrid, baseTooltip } from '@/lib/tema'
-import { useTemaAtual } from '@/lib/useTema'
 import { fmtFracaoPct, fmtHoras, fmtInt } from '@/lib/formato'
 import type { ItemRanking } from '@/server/indicadores/ranking'
 
@@ -34,8 +33,6 @@ export function RankingBarras({
   onSelecionar?: (rotulo: string) => void
   escala?: 'nominal' | 'ordinal'
 }) {
-  // o memo abaixo lê as variáveis CSS do tema — ver useTema.ts
-  const tema = useTemaAtual()
 
   const option = useMemo(() => {
     const tk = lerTokens()
@@ -108,7 +105,7 @@ export function RankingBarras({
         },
       ],
     }
-  }, [dados, onSelecionar, escala, tema])
+  }, [dados, onSelecionar, escala])
 
   const h = altura ?? Math.max(160, dados.length * 26 + 24)
   return <Chart option={option} altura={h} aria-label="Ranking de protocolos por dimensão" />

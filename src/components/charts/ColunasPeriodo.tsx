@@ -10,7 +10,6 @@ import {
   baseTooltip,
   rotuloValor,
 } from '@/lib/tema'
-import { useTemaAtual } from '@/lib/useTema'
 import { fmtInt, fmtPeriodo } from '@/lib/formato'
 import type { Granularidade } from '@/lib/filtros'
 
@@ -51,8 +50,6 @@ export function ColunasPeriodo({
   altura?: number
   unidade?: string
 }) {
-  // o memo abaixo lê as variáveis CSS do tema — ver useTema.ts
-  const tema = useTemaAtual()
 
   const option = useMemo(() => {
     const tk = lerTokens()
@@ -91,7 +88,7 @@ export function ColunasPeriodo({
         },
       ],
     }
-  }, [dados, granularidade, unidade, tema])
+  }, [dados, granularidade, unidade])
 
   return <Chart option={option} altura={altura} aria-label={`${unidade} por período`} />
 }

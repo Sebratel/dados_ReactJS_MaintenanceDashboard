@@ -3,6 +3,7 @@
 import { useIsFetching, useQueryClient } from '@tanstack/react-query'
 import { marcarAtualizacaoForcada } from '@/lib/useIndicador'
 import { useCallback, useEffect, useState } from 'react'
+import { Icone } from './Icone'
 
 /**
  * Botão "Atualizar" + idade do dado.
@@ -94,11 +95,8 @@ export function BotaoAtualizar() {
           color: 'var(--text-secondary)',
         }}
       >
-        <span
-          aria-hidden="true"
-          className={carregando ? 'inline-block animate-spin' : 'inline-block'}
-        >
-          ↻
+        <span className={carregando ? 'inline-flex animate-spin' : 'inline-flex'}>
+          <Icone nome="atualizar" tamanho={12} />
         </span>
         Atualizar
       </button>

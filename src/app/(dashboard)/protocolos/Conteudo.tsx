@@ -12,6 +12,7 @@ import {
 } from '@/lib/colunasProtocolo'
 import { fmtInt } from '@/lib/formato'
 import { StatTile } from '@/components/kpi/StatTile'
+import { Icone } from '@/components/Icone'
 
 const POR_PAGINA = 100
 
@@ -251,8 +252,8 @@ export function ProtocolosConteudo() {
 
         {erro ? (
           <div className="flex min-h-[240px] items-center justify-center px-4">
-            <p className="text-center text-sm text-[var(--status-critical)]">
-              <span aria-hidden="true">⚠ </span>
+            <p className="inline-flex items-center gap-1.5 text-center text-sm text-[var(--status-critical)]">
+              <Icone nome="alerta" tamanho={14} />
               {erro}
             </p>
           </div>
@@ -350,8 +351,12 @@ export function ProtocolosConteudo() {
           </div>
 
           {meta?.truncado && (
-            <span style={{ color: 'var(--status-warning)' }}>
-              ⚠ recorte maior que o teto de {fmtInt(meta.limite)} linhas — a lista está
+            <span
+              className="inline-flex items-center gap-1"
+              style={{ color: 'var(--status-warning)' }}
+            >
+              <Icone nome="alerta" tamanho={12} />
+              recorte maior que o teto de {fmtInt(meta.limite)} linhas — a lista está
               cortada nas mais recentes. Reduza o período para auditar tudo.
             </span>
           )}

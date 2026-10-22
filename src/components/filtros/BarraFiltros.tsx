@@ -7,6 +7,7 @@ import { EIXOS_DATA, GRANULARIDADES, parsearFiltros, presetsPeriodo, type Filtro
 import { fmtData } from '@/lib/formato'
 import { useOpcoesFiltro } from '@/lib/useIndicador'
 import { telaDoCaminho } from '@/config/telas'
+import { Icone } from '@/components/Icone'
 
 const CAMPOS_MULTI = [
   // Base primeiro de propósito: é o corte de supervisão, o mais usado.
@@ -189,8 +190,8 @@ export function BarraFiltros() {
                   }}
                   className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-[var(--surface-raised)]"
                 >
-                  <span className="w-4 shrink-0 text-center font-bold" aria-hidden="true">
-                    {ativo ? '✓' : ''}
+                  <span className="grid w-4 shrink-0 place-items-center" aria-hidden="true">
+                    {ativo && <Icone nome="ok" tamanho={13} traco={2.4} />}
                   </span>
                   <span className={ativo ? 'font-semibold' : ''}>{p.label}</span>
                 </button>
@@ -290,8 +291,8 @@ export function BarraFiltros() {
                       key={v}
                       className="flex w-full items-start gap-2 px-3 py-1.5 text-left text-xs text-[var(--text-muted)]"
                     >
-                      <span className="w-4 shrink-0 text-center font-bold" aria-hidden="true">
-                        ✓
+                      <span className="grid w-4 shrink-0 place-items-center" aria-hidden="true">
+                        <Icone nome="ok" tamanho={13} traco={2.4} />
                       </span>
                       <span>{v}</span>
                     </span>
@@ -337,8 +338,8 @@ export function BarraFiltros() {
                       }
                       className="flex w-full items-start gap-2 px-3 py-1.5 text-left text-xs hover:bg-[var(--surface-raised)]"
                     >
-                      <span className="w-4 shrink-0 text-center font-bold" aria-hidden="true">
-                        {marcado ? '✓' : ''}
+                      <span className="grid w-4 shrink-0 place-items-center" aria-hidden="true">
+                        {marcado && <Icone nome="ok" tamanho={13} traco={2.4} />}
                       </span>
                       <span className={marcado ? 'font-semibold' : ''}>{v}</span>
                     </button>
@@ -390,7 +391,7 @@ export function BarraFiltros() {
           }}
           role="note"
         >
-          <span aria-hidden="true">⚠</span>
+          <Icone nome="alerta" tamanho={13} className="mt-px shrink-0" />
           <span>
             <strong>Cancelados incluídos.</strong> Eles ficam fora do universo por
             padrão porque não são demanda real — aqui, taxa de encerramento vai a 0% e

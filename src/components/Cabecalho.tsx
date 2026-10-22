@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
 import { BotaoAtualizar } from './BotaoAtualizar'
 import { MenuUsuario } from './MenuUsuario'
 
@@ -89,7 +88,7 @@ export function Cabecalho({
             apoia no fundo dos dois temas sem precisar de variante.
           */}
           <img
-            src="/logo-sebratel.png"
+            src="/logo-circular-sebratel.png"
             alt=""
             width={28}
             height={28}
@@ -145,46 +144,9 @@ export function Cabecalho({
 
         <div className="ml-auto flex items-center gap-3">
           <BotaoAtualizar />
-          <AlternadorTema />
           <MenuUsuario papel={papel} controleAtivo={controleAtivo} />
         </div>
       </div>
     </header>
-  )
-}
-
-function AlternadorTema() {
-  const [tema, setTema] = useState<'claro' | 'escuro' | null>(null)
-
-  useEffect(() => {
-    const salvo = localStorage.getItem('tema')
-    if (salvo === 'claro' || salvo === 'escuro') {
-      setTema(salvo)
-      document.documentElement.dataset.theme = salvo === 'escuro' ? 'dark' : 'light'
-    } else {
-      setTema(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'escuro' : 'claro')
-    }
-  }, [])
-
-  if (tema === null) return <div className="size-7" />
-
-  const alternar = () => {
-    const novo = tema === 'claro' ? 'escuro' : 'claro'
-    setTema(novo)
-    localStorage.setItem('tema', novo)
-    document.documentElement.dataset.theme = novo === 'escuro' ? 'dark' : 'light'
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={alternar}
-      title={`Mudar para tema ${tema === 'claro' ? 'escuro' : 'claro'}`}
-      className="grid size-7 place-items-center rounded border text-xs transition-colors hover:border-[var(--border-strong)]"
-      style={{ borderColor: 'var(--border)' }}
-    >
-      <span aria-hidden="true">{tema === 'claro' ? '🌙' : '☀'}</span>
-      <span className="sr-only">Alternar tema</span>
-    </button>
   )
 }

@@ -10,7 +10,6 @@ import {
   baseGrid,
   baseTooltip,
 } from '@/lib/tema'
-import { useTemaAtual } from '@/lib/useTema'
 import { fmtFracaoPct, fmtInt } from '@/lib/formato'
 
 export type ItemComposto = {
@@ -58,8 +57,6 @@ export function RankingComposto({
   realce?: 'assertividade' | 'improdutivo'
   rotuloEixo?: string
 }) {
-  // o memo abaixo lê as variáveis CSS do tema — ver useTema.ts
-  const tema = useTemaAtual()
 
   const option = useMemo(() => {
     const tk = lerTokens()
@@ -160,7 +157,7 @@ export function RankingComposto({
         serie('Sem ação', tk.statusWarning, (d) => d.semAcao, true),
       ],
     }
-  }, [dados, rotuloEixo, realce, tema])
+  }, [dados, rotuloEixo, realce])
 
   const h = altura ?? Math.max(160, dados.length * 26 + 40)
   return (

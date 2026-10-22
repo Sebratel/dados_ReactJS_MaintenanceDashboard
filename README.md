@@ -385,9 +385,15 @@ jeito nesse cenário: o navegador também não alcançaria o Google.)
   por encerramento) — com eixo único as duas linhas se sobrepõem em 99,7%.
 - **Nunca eixo duplo em gráfico.** Métricas de unidades diferentes vão para
   gráficos separados compartilhando o eixo X.
-- **Vermelho da marca (`#D80010`) só no chrome**, nunca como série de dados —
-  senão colide com o vermelho semântico de "crítico". Paleta categórica de 7
-  slots validada com o script do guia de dataviz.
+- **A paleta é a do relatório de origem: vinho `#880F17` e dourado `#D9B300`**,
+  a mesma do COM · Gestão Comercial (skill `padrao-frontend-dashboards`). Foi
+  contada nos `visual.json` do `MAN - Relatório Manutenção FTTX.pbip` em
+  22/10/2026: `#880F17` aparece 233 vezes, o dourado é a série principal. O
+  vermelho `#D80010` de antes saiu dos pixels do LOGO (docs/02 §8), não das cores
+  dos visuais — e por isso divergia. O vinho fica no chrome (barra de título,
+  navegação); as séries seguem a ordem fixa dourado → laranja → grafite, e o
+  vermelho de "crítico" (`#B3261E`) é reservado a estado. Sem tema escuro: a
+  casca Sebratel não tem.
 - **Timestamps do ERP são `timestamp without time zone`** e chegam como string
   crua. Todo cálculo de dia/mês/turno acontece no Postgres, nunca no JS.
 - **Visita improdutiva é contador INDEPENDENTE, não um status excludente.** Um
