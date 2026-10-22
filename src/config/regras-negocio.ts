@@ -589,3 +589,56 @@ export const BASE_POR_CIDADE: Record<string, string> = {
 /** Janela histórica mínima carregada (pendência P5 — parametrizável). */
 export const DATA_INICIO_HISTORICO =
   process.env.DATA_INICIO_HISTORICO ?? '2025-01-01'
+
+/**
+ * Feriados que derrubam a entrada de reparo — usados só pela tela de Predições.
+ *
+ * Feriado não é um dia da semana: a previsão olha as 8 últimas semanas do MESMO
+ * dia, e uma segunda-feira de feriado prevista como segunda comum erra por 40%.
+ * Medido em 2026: 03/04 (sexta) teve 36 reparos, 01/05 teve 60, 07/09 (segunda)
+ * 61 e 12/10 (segunda) 50 — contra 90 a 110 num dia útil e 57 a 72 num sábado.
+ * Por isso o dia de feriado é previsto com o perfil do SÁBADO, e os feriados do
+ * passado saem das medianas do dia da semana em que caíram.
+ *
+ * ⚠️ CORPUS CHRISTI FICA DE FORA DE PROPÓSITO: é ponto facultativo, e o dado
+ * concorda — 04/06/2026 teve 79 reparos, uma quinta-feira quase normal. Tratar
+ * como feriado erraria para baixo.
+ *
+ * Só nacionais + o estadual do RS (20/09). Feriado municipal das cidades
+ * atendidas não está aqui; se a Manutenção notar o dia, é acrescentar a data.
+ */
+export const FERIADOS: Readonly<Record<string, string>> = {
+  '2025-01-01': 'Confraternização Universal',
+  '2025-04-18': 'Sexta-feira Santa',
+  '2025-04-21': 'Tiradentes',
+  '2025-05-01': 'Dia do Trabalho',
+  '2025-09-07': 'Independência',
+  '2025-09-20': 'Revolução Farroupilha',
+  '2025-10-12': 'Nossa Senhora Aparecida',
+  '2025-11-02': 'Finados',
+  '2025-11-15': 'Proclamação da República',
+  '2025-11-20': 'Consciência Negra',
+  '2025-12-25': 'Natal',
+  '2026-01-01': 'Confraternização Universal',
+  '2026-04-03': 'Sexta-feira Santa',
+  '2026-04-21': 'Tiradentes',
+  '2026-05-01': 'Dia do Trabalho',
+  '2026-09-07': 'Independência',
+  '2026-09-20': 'Revolução Farroupilha',
+  '2026-10-12': 'Nossa Senhora Aparecida',
+  '2026-11-02': 'Finados',
+  '2026-11-15': 'Proclamação da República',
+  '2026-11-20': 'Consciência Negra',
+  '2026-12-25': 'Natal',
+  '2027-01-01': 'Confraternização Universal',
+  '2027-03-26': 'Sexta-feira Santa',
+  '2027-04-21': 'Tiradentes',
+  '2027-05-01': 'Dia do Trabalho',
+  '2027-09-07': 'Independência',
+  '2027-09-20': 'Revolução Farroupilha',
+  '2027-10-12': 'Nossa Senhora Aparecida',
+  '2027-11-02': 'Finados',
+  '2027-11-15': 'Proclamação da República',
+  '2027-11-20': 'Consciência Negra',
+  '2027-12-25': 'Natal',
+}

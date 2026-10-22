@@ -42,7 +42,10 @@
   gap: var(--gap);
   max-width: 1680px;
   margin: 0 auto;
-  padding: 12px 16px 24px;
+  /* 12 + 22 = os 34px que `--chrome` reserva para o respiro da página. Com 24
+     embaixo, toda tela de duas faixas passava 2px da janela e ganhava uma
+     barra de rolagem que não rolava nada (medido nas Predições, 22/10/2026). */
+  padding: 12px 16px 22px;
 }
 .pagina.com-kpis {
   --area: calc(var(--util) - var(--h-kpis) - var(--gap));
@@ -347,6 +350,9 @@ table.tabela td {
 table.tabela th.texto,
 table.tabela td.texto { text-align: left; }
 table.tabela td.texto { white-space: normal; }
+/* lista operacional: uma linha por registro, e a caixa rola na horizontal —
+   protocolo com a data quebrada em duas linhas some no meio da lista */
+table.tabela.sem-quebra td.texto { white-space: nowrap; }
 table.tabela th.centro,
 table.tabela td.centro { text-align: center; }
 table.tabela tbody tr:hover td { background: var(--pbi-hover); }

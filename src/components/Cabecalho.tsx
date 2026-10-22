@@ -47,6 +47,8 @@ const NAV = TELAS.map((t) => ({ href: t.caminho, label: t.rotulo, id: t.id }))
 const CORTES_DA_TELA: Record<string, string> = {
   reincidencia: '/protocolos',
   retorno: '/protocolos',
+  // a pergunta aberta nas Predições não é recorte de dado de tela nenhuma
+  pergunta: '/predicoes',
 }
 
 /** O endereço de `destino` levando junto o recorte que sobrevive lá. */

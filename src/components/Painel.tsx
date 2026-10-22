@@ -25,7 +25,8 @@ export type PainelProps = {
   descricao?: string
   /** rodapé curto: fonte, ressalva, tempo de consulta */
   nota?: ReactNode
-  children: ReactNode
+  /** o gráfico; opcional só para o painel `soTabela` */
+  children?: ReactNode
   /**
    * Visão de tabela — obrigatória em todo gráfico.
    * Além de acessibilidade, é o "canal de alívio" que deixa conferir o número
@@ -43,6 +44,15 @@ export type PainelProps = {
    * dele não tem linha — que cobre quase todos os casos.
    */
   vazio?: boolean
+  /** Texto do estado vazio, quando "sem dados" não é a leitura certa (ex.: nenhum alerta). */
+  textoVazio?: string
+  /**
+   * Painel que É uma lista: abre direto na tabela e não oferece o alternador.
+   * Copiar, CSV e a leitura por IA continuam valendo; `children` é ignorado.
+   */
+  soTabela?: boolean
+  /** Uma linha por registro (lista operacional); a tabela rola na horizontal se não couber. */
+  semQuebra?: boolean
 }
 
 /**
@@ -66,8 +76,12 @@ export function Painel({
   carregando = false,
   erro = null,
   vazio,
+  textoVazio = 'Sem dados para este recorte.',
+  soTabela = false,
+  semQuebra = false,
 }: PainelProps) {
-  const [modo, setModo] = useState<'grafico' | 'tabela'>('grafico')
+  const [modoEscolhido, setModo] = useState<'grafico' | 'tabela'>('grafico')
+  const modo = soTabela ? 'tabela' : modoEscolhido
 
   /**
    * Retorno visível do "Copiar".
@@ -116,7 +130,9 @@ export function Painel({
             confere numa auditoria — se o gráfico mostra 12 barras e a tabela diz
             48 linhas, a divergência aparece antes de abrir o Excel.
           */}
-          {tabela && modo === 'tabela' && (
+          {/* com erro ou carregando não há tabela na tela: "0 linhas · Copiar"
+              ali convidaria a exportar um vazio como se fosse o dado */}
+          {tabela && modo === 'tabela' && !erro && !carregando && (
             <>
               <span style={{ fontSize: 11, opacity: 0.85 }} className="tabular">
                 {tabela.linhas.length} {tabela.linhas.length === 1 ? 'linha' : 'linhas'}
@@ -155,7 +171,7 @@ export function Painel({
             />
           )}
           {acoes}
-          {tabela && (
+          {tabela && !soTabela && (
             <Segmentado
               rotulo="alternar visualização"
               valor={modo}
@@ -184,12 +200,12 @@ export function Painel({
             <div className="carregando-barra" />
           </div>
         ) : semDados ? (
-          <div className="estado">Sem dados para este recorte.</div>
+          <div className="estado">{textoVazio}</div>
         ) : modo === 'grafico' || !tabela ? (
           children
         ) : (
           <div className="tabela-caixa">
-            <table className="tabela">
+            <table className={semQuebra ? 'tabela sem-quebra' : 'tabela'}>
               <thead>
                 <tr>
                   {tabela.colunas.map((c) => (

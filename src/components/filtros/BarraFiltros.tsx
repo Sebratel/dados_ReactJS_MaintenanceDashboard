@@ -6,7 +6,7 @@ import { CATALOGOS_MANUTENCAO, STATUS_CANCELADO, TIPOS_PREVENTIVOS } from '@/con
 import { EIXOS_DATA, GRANULARIDADES, parsearFiltros, presetsPeriodo, type Filtros } from '@/lib/filtros'
 import { useOpcoesFiltro } from '@/lib/useIndicador'
 import { useAlturaComoVariavel } from '@/lib/useAlturaComoVariavel'
-import { telaDoCaminho } from '@/config/telas'
+import { telaTemFiltros } from '@/config/telas'
 import { Icone } from '@/components/Icone'
 import { Segmentado } from '@/components/Segmentado'
 import { SeletorLista } from './SeletorLista'
@@ -158,12 +158,14 @@ export function BarraFiltros() {
    * decide o `permitido` do layout — ver item Z de docs/06. Com a barra
    * consertada o sinal visível some e a causa continua; tratar lá é o que fecha.
    *
-   * O teste é o CATÁLOGO e não uma lista de rotas proibidas: `telaDoCaminho`
-   * conhece as 8 telas de dados, e `/configuracoes` está fora dele por desenho
+   * O teste é o CATÁLOGO e não uma lista de rotas proibidas: `telaTemFiltros`
+   * conhece as telas de dados, e `/configuracoes` está fora dele por desenho
    * (ver `config/telas.ts`). Assim, rota nova que não seja tela de dados nasce
    * sem a barra por omissão, em vez de esperar que alguém lembre de listá-la.
+   * Tela de dados que não obedece aos filtros (Predições) declara
+   * `semFiltros` no catálogo.
    */
-  if (!telaDoCaminho(pathname)) return null
+  if (!telaTemFiltros(pathname)) return null
 
   return (
     /*

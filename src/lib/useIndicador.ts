@@ -16,6 +16,7 @@ import type { ResultadoPreventivos } from '@/server/indicadores/preventivos'
 import type { ResultadoOfensores } from '@/server/indicadores/ofensores'
 import type { ResultadoHistorico } from '@/server/indicadores/historico'
 import type { LinhaProtocolo } from '@/server/indicadores/protocolos'
+import type { ResultadoPredicoes, ResultadoRiscoAbertos } from '@/server/indicadores/predicoes'
 
 export type Envelope<T, M = Record<string, unknown>> = {
   data: T
@@ -318,5 +319,30 @@ export function useHistorico(f: Filtros) {
       buscar<ResultadoHistorico['data'], ResultadoHistorico['meta']>('historico', f),
     refetchInterval: 1_800_000,
     staleTime: 300_000,
+  })
+}
+
+/**
+ * Predições — SEM filtros, de propósito (ver server/indicadores/predicoes.ts).
+ * A chamada não leva a URL da tela: o servidor ignoraria, e a chave do cache
+ * do navegador variaria à toa com o período que veio de outra aba.
+ */
+export function usePredicoes() {
+  return useQuery({
+    queryKey: chave('predicoes', {}),
+    queryFn: () => buscar<ResultadoPredicoes['data'], ResultadoPredicoes['meta']>('predicoes', {}),
+    refetchInterval: 1_800_000,
+    staleTime: 600_000,
+  })
+}
+
+/** Os reparos abertos agora. O servidor guarda 10 min; mais que isso o risco envelhece. */
+export function useRiscoAbertos() {
+  return useQuery({
+    queryKey: chave('riscoAbertos', {}),
+    queryFn: () =>
+      buscar<ResultadoRiscoAbertos['data'], ResultadoRiscoAbertos['meta']>('riscoAbertos', {}),
+    refetchInterval: 600_000,
+    staleTime: 120_000,
   })
 }

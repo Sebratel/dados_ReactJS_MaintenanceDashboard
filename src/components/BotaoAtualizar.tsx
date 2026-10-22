@@ -24,9 +24,9 @@ import { Icone } from './Icone'
  * Agora a idade é a de `meta.geradoEm` de cada indicador da tela, e vale a do
  * MAIS VELHO — é ele que limita o quanto a tela inteira está em dia.
  *
- * O PONTO: verde é em dia; dourado é dado com mais de `VELHO_MS` (passou de
- * todas as validades do servidor, então algo não está renovando); vermelho é
- * consulta com erro na tela.
+ * O PONTO: verde é em dia; dourado é algum indicador com mais do dobro da
+ * própria validade no servidor (algo não está renovando); vermelho é consulta
+ * com erro na tela.
  *
  * PROTEÇÕES DO BOTÃO:
  * - desabilitado enquanto qualquer consulta estiver correndo, para o clique
@@ -36,22 +36,33 @@ import { Icone } from './Icone'
  *   `no-store` ao navegador — sem isso o botão devolveria a cópia local.
  */
 
-/** A maior validade de cache do servidor é 30 min; passou disso, está velho. */
+/**
+ * Quando um dado passa a ser "velho": o dobro da validade dele no servidor,
+ * nunca menos de 30 min. Era 30 min fixos, que só servia enquanto a maior
+ * validade era 30 min — as Predições valem 3 h, e com o limite fixo a tela
+ * delas ficaria dourada quase o tempo todo, com o dado em dia.
+ */
 const VELHO_MS = 30 * 60_000
 
-type Situacao = { maisVelho: number | null; falhou: boolean }
+type Situacao = { maisVelho: number | null; velho: boolean; falhou: boolean }
+
+type MetaDatada = { meta?: { geradoEm?: string; validadeSegundos?: number } }
 
 /** Lê as consultas ATIVAS (as que a tela está mostrando) no cache do cliente. */
-function situacaoDaTela(qc: QueryClient): Situacao {
+function situacaoDaTela(qc: QueryClient, agora: number): Situacao {
   let maisVelho: number | null = null
+  let velho = false
   let falhou = false
   for (const q of qc.getQueryCache().findAll({ type: 'active' })) {
     if (q.state.status === 'error') falhou = true
-    const gerado = (q.state.data as { meta?: { geradoEm?: string } } | undefined)?.meta?.geradoEm
-    const t = gerado ? Date.parse(gerado) : Number.NaN
-    if (Number.isFinite(t) && (maisVelho === null || t < maisVelho)) maisVelho = t
+    const meta = (q.state.data as MetaDatada | undefined)?.meta
+    const t = meta?.geradoEm ? Date.parse(meta.geradoEm) : Number.NaN
+    if (!Number.isFinite(t)) continue
+    if (maisVelho === null || t < maisVelho) maisVelho = t
+    const limite = Math.max(VELHO_MS, 2 * (meta?.validadeSegundos ?? 0) * 1000)
+    if (agora - t > limite) velho = true
   }
-  return { maisVelho, falhou }
+  return { maisVelho, velho, falhou }
 }
 
 export function BotaoAtualizar() {
@@ -86,20 +97,18 @@ export function BotaoAtualizar() {
 
   // Antes da montagem não há cache para ler — e o HTML do servidor tem de bater
   // com a primeira pintura do cliente.
-  const { maisVelho, falhou } = montado ? situacaoDaTela(qc) : { maisVelho: null, falhou: false }
+  const { maisVelho, velho, falhou } = montado
+    ? situacaoDaTela(qc, Date.now())
+    : { maisVelho: null, velho: false, falhou: false }
 
-  const ponto = falhou
-    ? 'error'
-    : maisVelho !== null && Date.now() - maisVelho > VELHO_MS
-      ? 'stale'
-      : ''
+  const ponto = falhou ? 'error' : velho ? 'stale' : ''
 
   const rotulo = carregando ? 'atualizando…' : maisVelho !== null ? haQuanto(maisVelho) : '—'
 
   const dica = falhou
     ? 'Algum painel desta tela não carregou.'
     : maisVelho !== null
-      ? `Dado mais antigo nesta tela: ${fmtInstante(maisVelho)}. Cada indicador fica guardado no servidor de 1 a 30 min.`
+      ? `Dado mais antigo nesta tela: ${fmtInstante(maisVelho)}. Cada indicador fica guardado no servidor de 1 min a 3 h, conforme muda.`
       : 'Esta tela não tem indicador para datar.'
 
   return (

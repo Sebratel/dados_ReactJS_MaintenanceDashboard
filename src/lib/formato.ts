@@ -72,6 +72,19 @@ export function fmtDiaCurto(iso: string): string {
   return `${d}/${m}`
 }
 
+const SEMANA_CURTA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
+
+/**
+ * "2026-10-22" → "qui 22/10". Na previsão o dia da semana É a informação: é
+ * ele que explica por que o domingo prevê metade da segunda. Calculado em UTC
+ * para não depender do fuso do navegador.
+ */
+export function fmtDiaSemana(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`)
+  if (Number.isNaN(d.getTime())) return iso
+  return `${SEMANA_CURTA[d.getUTCDay()]} ${fmtDiaCurto(iso)}`
+}
+
 /** "2026-08-05" → "05/08/2026" */
 export function fmtData(iso: string): string {
   const [a, m, d] = iso.split('-')

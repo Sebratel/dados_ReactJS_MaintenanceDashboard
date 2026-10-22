@@ -2,7 +2,7 @@ import { readdirSync, existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { INDICADORES } from '@/server/indicadores'
-import { TELAS, TELAS_POR_INDICADOR, telaDoCaminho } from './telas'
+import { TELAS, TELAS_POR_INDICADOR, telaDoCaminho, telaTemFiltros } from './telas'
 
 /**
  * O catálogo de telas é o contrato de AUTORIZAÇÃO. Uma tela que exista em disco
@@ -75,7 +75,7 @@ describe('mapa de indicador para tela', () => {
     // Se um destes passar a alimentar várias telas, a regra "acesso a pelo menos
     // uma" deixa de restringir dado nominal — e isso precisa ser uma decisão,
     // não um efeito colateral.
-    for (const nominal of ['produtividade', 'ofensores', 'recorrencia'] as const) {
+    for (const nominal of ['produtividade', 'ofensores', 'recorrencia', 'predicoes', 'riscoAbertos'] as const) {
       expect(TELAS_POR_INDICADOR[nominal]).toHaveLength(1)
     }
   })
@@ -101,12 +101,20 @@ describe('telaDoCaminho como regra da barra de filtros', () => {
   it('reconhece as 8 telas de dados — nelas a barra aparece', () => {
     for (const caminho of AS_OITO) {
       expect(telaDoCaminho(caminho), `${caminho} deveria estar no catálogo`).toBeDefined()
+      expect(telaTemFiltros(caminho), `${caminho} deveria ter a barra`).toBe(true)
     }
+  })
+
+  it('Predições está no catálogo (acesso) mas SEM a barra — ela não obedece aos filtros', () => {
+    expect(telaDoCaminho('/predicoes')?.id).toBe('predicoes')
+    expect(telaTemFiltros('/predicoes')).toBe(false)
   })
 
   it('NÃO reconhece /configuracoes nem /capa — lá não há o que recortar', () => {
     expect(telaDoCaminho('/configuracoes')).toBeUndefined()
     expect(telaDoCaminho('/capa')).toBeUndefined()
+    expect(telaTemFiltros('/configuracoes')).toBe(false)
+    expect(telaTemFiltros('/capa')).toBe(false)
   })
 
   it('rota desconhecida nasce SEM barra, em vez de esperar quem a proíba', () => {

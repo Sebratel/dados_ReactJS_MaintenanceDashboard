@@ -138,6 +138,8 @@ src/
 | `/recorrencia` | Clientes recorrentes + Indicadores Recorrência + Clientes reincidentes | ✅ |
 | `/preventivos` | Preventivos (qualidade da ação preventiva) | ✅ |
 | `/ofensores` | Ofensores (reparo atual × anterior, técnicos ofensores) | ✅ |
+| `/historico` | Séries mensais sobre a base de clientes (Campo, Recorrência, Preventivos) | ✅ |
+| `/predicoes` | — (não existe no Power BI) | ✅ previsões; não obedece aos filtros |
 | `/protocolos` | Indicadores Manutenção (grid detalhado + export) | ✅ |
 | `/configuracoes` | — (não existe no Power BI) | ✅ só admin: usuários e matriz de acesso |
 
@@ -151,6 +153,38 @@ aplicados, para comparar direto com o export do Voalle. Ver
 contra 2.361 em julho/2026): aquele exclui preventivas e requisições, este as
 inclui porque Preventivos e Ofensores dependem delas. A tabela com a origem de
 cada diferença está no docs/05.
+
+### Predições
+
+Seis perguntas sobre os próximos dias, cada uma respondida por um KPI no topo e
+detalhada numa aba (`?pergunta=`):
+
+| Pergunta | Como | Acerto medido em 22/10/2026 |
+|---|---|---|
+| Quantos reparos vão entrar (14 dias) | mediana das 8 últimas semanas do mesmo dia da semana; feriado como sábado | erro médio ~17 reparos/dia (~19%) |
+| O campo dá conta | previsão × visitas por reparo contra o ritmo típico do dia da semana | — |
+| Quais abertos passam de 48h | chance histórica de passar de 48h na idade atual; agenda depois das 48h = certo | coorte de ~7.300 reparos |
+| Onde a rede pede socorro | bairro nas últimas 4 semanas × esperado pelas 12 anteriores (z > 2); picos de um dia (Poisson) | — |
+| Quem deve voltar a abrir reparo | taxa observada por reparos em 90 dias × recência | só 10% do reparo do mês seguinte vem de quem já tinha reparo |
+| Quão confiável é a previsão | faixa calibrada em 12 semanas e avaliada nas 8 seguintes | 68% dentro da faixa que promete 80% |
+
+Nada é modelo treinado — são contagens e medianas que dá para refazer numa
+planilha, e a aba Confiabilidade mostra o acerto. As contas estão em
+`src/lib/previsao.ts` (com testes); o SQL em `src/server/indicadores/predicoes.ts`.
+
+- **Não obedece aos filtros**, e a barra não aparece: recortar por cidade deixaria
+  a série diária com 5 a 15 reparos, e a faixa calibrada deixaria de valer. O
+  catálogo marca a tela com `semFiltros`.
+- **Custo**: as previsões são cinco consultas, ~13 s na réplica, em ondas; ficam
+  guardadas **3 h** (o dado é diário). A lista de abertos custa ~2 s e vale **10
+  min**. A chave de cache ignora a URL (`recorte` no registro de indicadores),
+  então trazer um período de outra aba não refaz a conta.
+- **Feriados** ficam em `FERIADOS` (`config/regras-negocio.ts`): nacionais + 20/09
+  (RS). Corpus Christi fica de fora porque o dado mostra dia quase normal.
+  Feriado municipal novo é só acrescentar a data.
+- A agenda da Manutenção é montada no próprio dia — em 22/10/2026 não havia
+  nenhum horário reservado de amanhã em diante — por isso "agenda já ocupada"
+  não entra na conta do campo.
 
 ## Atualização dos dados
 

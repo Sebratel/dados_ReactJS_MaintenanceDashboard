@@ -57,7 +57,8 @@ export async function GET(
     // O single-flight do memoizar continua valendo, então cliques simultâneos
     // compartilham uma execução só.
     const forcar = req.nextUrl.searchParams.get('atualizar') === '1'
-    const chave = chaveDe(slug, filtros)
+    // quem não obedece aos filtros declara o próprio recorte (ver index.ts)
+    const chave = chaveDe(slug, 'recorte' in ind ? ind.recorte(filtros) : filtros)
 
     // L2 (Redis) entre o L1 e o banco. Só semeia o L1 depois de um redeploy —
     // todo o single-flight/stale-while-revalidate continua no L1, e isto roda
@@ -101,6 +102,9 @@ export async function GET(
           idadeMs,
           filtros,
           geradoEm: new Date(Date.now() - idadeMs).toISOString(),
+          // o topo da tela decide "velho" por indicador: 40 min é velho para
+          // os KPIs (60 s) e normal para as Predições (3 h)
+          validadeSegundos: ind.cacheSegundos,
         },
       },
       {

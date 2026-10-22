@@ -31,6 +31,11 @@ export type Tela = {
   rotulo: string
   /** O que a tela expõe — texto mostrado ao administrador na matriz. */
   contem: string
+  /**
+   * A tela não obedece à barra de filtros, então a barra não aparece nela.
+   * Filtro que não faz nada é pior que filtro ausente (item 30).
+   */
+  semFiltros?: true
 }
 
 export const TELAS = [
@@ -83,6 +88,13 @@ export const TELAS = [
     contem: 'Série mensal de volume contra a base de clientes.',
   },
   {
+    id: 'predicoes',
+    caminho: '/predicoes',
+    rotulo: 'Predições',
+    contem: 'Previsões da Manutenção; lista protocolos abertos e logins PPPoE com reparo repetido.',
+    semFiltros: true,
+  },
+  {
     id: 'protocolos',
     caminho: '/protocolos',
     rotulo: 'Protocolos',
@@ -115,6 +127,16 @@ export function telaDoCaminho(caminho: string): TelaCatalogada | undefined {
 }
 
 /**
+ * A barra de filtros aparece aqui? Só em tela de dados que obedece a ela —
+ * Configurações e Capa estão fora do catálogo, e as Predições estão nele mas
+ * calculam sobre o universo inteiro.
+ */
+export function telaTemFiltros(caminho: string): boolean {
+  const t = telaDoCaminho(caminho)
+  return t !== undefined && !('semFiltros' in t)
+}
+
+/**
  * Que telas consomem cada indicador da API.
  *
  * Existe porque esconder a TELA sem fechar o ENDPOINT não esconde nada: quem
@@ -138,6 +160,8 @@ export const TELAS_POR_INDICADOR: Record<string, readonly IdTela[]> = {
   preventivos: ['preventivos'],
   ofensores: ['ofensores'],
   historico: ['historico'],
+  predicoes: ['predicoes'],
+  riscoAbertos: ['predicoes'],
   /**
    * As opções dos combos alimentam a barra de filtros, que existe em TODAS as
    * telas. Quem entrou no dashboard já pode vê-las: são nomes de cidade, equipe
