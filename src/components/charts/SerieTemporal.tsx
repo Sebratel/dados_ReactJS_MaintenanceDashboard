@@ -10,6 +10,7 @@ import {
   baseGrid,
   baseTooltip,
   gradienteColuna,
+  rotuloValor,
 } from '@/lib/tema'
 import { fmtInt, fmtPeriodo } from '@/lib/formato'
 import type { PontoSerie } from '@/server/indicadores/serie'
@@ -203,6 +204,19 @@ export function SerieTemporal({
           data: dados.map((d) => d.abertos),
           itemStyle: { color: gradienteColuna(tk), borderRadius: MARCA.barraTopo4px },
           emphasis: { focus: 'series' as const },
+          /*
+           * DENTRO do topo da coluna, como no Histórico. Até 29/10/2026 este
+           * gráfico não tinha número: em 17/09 eram duas linhas no mesmo eixo, e
+           * o rótulo de uma cairia na outra. Desde 19/10 é coluna + linha de
+           * saldo em eixos separados — o caso que 'insideTop' resolve: a linha
+           * passa por cima da coluna sem cruzar o número dela.
+           */
+          ...rotuloValor({
+            n: dados.length,
+            formatter: (p) => (p.value === null ? '' : fmtInt(p.value)),
+            cor: tk.textPrimary,
+            position: 'insideTop',
+          }),
         },
         {
           name: 'Saldo (entra − sai)',

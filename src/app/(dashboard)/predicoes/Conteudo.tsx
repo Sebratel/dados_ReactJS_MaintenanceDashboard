@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { usePredicoes, useRiscoAbertos } from '@/lib/useIndicador'
 import { useAlturaComoVariavel } from '@/lib/useAlturaComoVariavel'
@@ -47,9 +47,29 @@ const diaHora = (s: string) => fmtDataHora(s).replace(/\/\d{4}/, '')
 
 const ROTULO_MOTIVO: Record<MotivoRisco, string> = {
   estourou: 'Já passou de 48h',
-  'agenda-tarde': 'Agenda depois das 48h',
+  'agenda-tarde': 'Visita depois das 48h',
   curva: 'Pela idade',
 }
+
+const ROTULO_AGENDAMENTO = { pedido: 'Pedido do cliente', agenda: 'Conforme agenda' } as const
+
+/**
+ * A visita atual é a que o cliente pediu: 1º agendamento a pedido dele e
+ * nenhuma remarcação. Remarcado, não se sabe o motivo da data nova — a
+ * classificação continua na coluna, mas não vai para o "Por quê".
+ *
+ * A tela INFORMA, não prescreve: nada de "não dá para antecipar". Se vale
+ * ligar para o cliente é decisão do time operacional (29/10/2026).
+ */
+/**
+ * "Vezes o normal" com UMA casa (30/10/2026): "Rincão 2,00×" fazia perguntar
+ * se era 2 ou 2 mil — a segunda casa não diz nada sobre um bairro.
+ */
+const nfVezes = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const fmtVezes = (n: number) => `${nfVezes.format(n)}×`
+
+const pedidoDoCliente = (a: { primeiroAgendamento: string | null; remarcacoes: number }) =>
+  a.primeiroAgendamento === 'pedido' && a.remarcacoes === 0
 
 export function PredicoesConteudo() {
   const sp = useSearchParams()
@@ -95,6 +115,17 @@ export function PredicoesConteudo() {
       })
   }, [d?.fechamento, qa.data])
 
+  /**
+   * Hora de idade escolhida no gráfico da curva: a tabela mostra só os abertos
+   * daquela hora. Estado local e não URL — é um olhar de momento, e a lista
+   * muda a cada 10 minutos (o aberto de 47h agora já terá 48h na próxima).
+   */
+  const [horaSel, setHoraSel] = useState<number | null>(null)
+  const abertosTabela = useMemo(
+    () => (horaSel === null ? abertos : abertos.filter((a) => Math.floor(a.idadeH) === horaSel)),
+    [abertos, horaSel]
+  )
+
   const resumoAbertos = useMemo(() => {
     const salvaveis = abertos.filter((a) => a.motivo !== 'estourou')
     return {
@@ -103,6 +134,7 @@ export function PredicoesConteudo() {
       esperados: salvaveis.reduce((s, a) => s + a.risco, 0),
       estouraram: abertos.length - salvaveis.length,
       agendaTarde: salvaveis.filter((a) => a.motivo === 'agenda-tarde').length,
+      agendaTardePedido: salvaveis.filter((a) => a.motivo === 'agenda-tarde' && pedidoDoCliente(a)).length,
     }
   }, [abertos])
 
@@ -149,9 +181,13 @@ export function PredicoesConteudo() {
             RECORTE INVISÍVEL GERA CHAMADO. Quem chega de outra aba com "Canoas"
             no filtro precisa ler aqui que estes números são da Manutenção
             inteira — senão compara com a tela anterior e acha que está errado.
+            O "só reparos" é pelo mesmo motivo: Operação conta preventiva junto, e
+            o 52 daqui contra o 53 de lá virou pergunta em 29/10/2026. A folga do
+            campo é a exceção (o ritmo do time inclui as visitas de preventiva),
+            e "só reparos" sozinho a contradizia (30/10/2026).
           */}
           <span className="grupo-rotulo" style={{ marginLeft: 'auto' }}>
-            Manutenção inteira, sem filtros
+            Reparos sem preventivas (a folga do campo conta as duas) · Manutenção inteira, sem filtros
             {ontem && <> · histórico até {fmtData(ontem)}</>}
           </span>
         </div>
@@ -160,7 +196,7 @@ export function PredicoesConteudo() {
       <div className="pagina com-kpis">
         <Kpis rotulo="Respostas das predições">
           <StatTile
-            rotulo="Reparos em 7 dias"
+            rotulo="Previsão reparos próx. 7 dias"
             valor={v(fmtInt(semana.reparos))}
             destaque
             contexto={ctx(
@@ -195,7 +231,7 @@ export function PredicoesConteudo() {
             status={!d ? null : (emAlta.length > 0 || d.bairros.aglomeracoes.length > 0) ? 'warning' : 'good'}
             contexto={ctx(
               emAlta[0]
-                ? `${emAlta[0].bairro} ${fmtDec(emAlta[0].razao)}× · ${fmtInt(d?.bairros.aglomeracoes.length ?? 0)} pico(s) em 14 dias`
+                ? `${emAlta[0].bairro} ${fmtVezes(emAlta[0].razao)} · ${fmtInt(d?.bairros.aglomeracoes.length ?? 0)} pico(s) em 14 dias`
                 : `${fmtInt(d?.bairros.aglomeracoes.length ?? 0)} pico(s) de bairro em 14 dias`
             )}
           />
@@ -208,12 +244,11 @@ export function PredicoesConteudo() {
                 : 'em 90 dias · sem histórico para a chance'
             )}
           />
-          <StatTile
-            rotulo="Acerto da previsão"
-            valor={v(av ? fmtFracaoPct(av.cobertura, 0) : '—')}
-            status={!av ? null : av.cobertura < 0.7 ? 'warning' : 'good'}
-            contexto={ctx(av ? `prometia 80% · erro médio ${fmtInt(Math.round(av.erroMedio))} reparos/dia` : 'histórico curto para medir')}
-          />
+          {/*
+            "Acerto da previsão" saiu dos cartões em 30/10/2026, antes da
+            apresentação aos times: "70% de quê?" não se explica num cartão. O
+            número continua na pergunta Confiabilidade; volta depois, se pedirem.
+          */}
         </Kpis>
 
         {pergunta === 'demanda' && (
@@ -258,7 +293,7 @@ export function PredicoesConteudo() {
               <Painel
                 titulo="O campo dá conta?"
                 classe="v-tabela"
-                descricao="Visitas que o time de Manutenção faz num dia típico (mediana das últimas 8 semanas) contra as visitas de reparo que a entrada prevista vai pedir. O que sobra é espaço para preventiva."
+                descricao="Visitas de reparo e preventivas que o time de Manutenção faz num dia típico (mediana das últimas 8 semanas) contra as visitas de reparo que a entrada prevista vai pedir. O que sobra é espaço para preventiva."
                 carregando={carregando}
                 erro={erroP}
                 nota={
@@ -298,7 +333,119 @@ export function PredicoesConteudo() {
         )}
 
         {pergunta === 'abertos' && (
-          <section className="faixa terco">
+          <section className="faixa dois-tercos">
+            <Painel
+              titulo="Reparos abertos agora"
+              classe="v-cheia"
+              soTabela
+              semQuebra
+              descricao={`Os que ainda dá para salvar primeiro, do mais arriscado ao menos.${
+                qa.data
+                  ? ` ${fmtInt(resumoAbertos.agendaTarde)} com visita agendada depois das 48h${
+                      resumoAbertos.agendaTardePedido > 0
+                        ? `, ${fmtInt(resumoAbertos.agendaTardePedido)} delas a pedido do cliente`
+                        : ''
+                    }.`
+                  : ''
+              }`}
+              carregando={qa.isLoading || carregando}
+              erro={erroA ?? erroP}
+              textoVazio={horaSel === null ? 'Nenhum reparo aberto agora.' : `Nenhum aberto com ${horaSel}h agora.`}
+              acoes={
+                horaSel !== null ? (
+                  <button
+                    type="button"
+                    className="btn-cab"
+                    onClick={() => setHoraSel(null)}
+                    title="Voltar a mostrar todos os abertos"
+                  >
+                    Só abertos há {horaSel}h ✕
+                  </button>
+                ) : undefined
+              }
+              nota={qa.data ? <>Lista renovada a cada 10 min · leitura de {fmtDataHora(qa.data.meta.agora)}</> : undefined}
+              tabela={{
+                colunas: [
+                  { chave: 'protocolo', rotulo: 'Protocolo' },
+                  { chave: 'aberto', rotulo: 'Aberto em', ordenarPor: '_criado' },
+                  { chave: 'idade', rotulo: 'Idade', alinhar: 'dir', ordenarPor: '_idade' },
+                  { chave: 'chance', rotulo: 'Chance', alinhar: 'dir', ordenarPor: '_risco' },
+                  { chave: 'motivo', rotulo: 'Por quê' },
+                  { chave: 'agenda', rotulo: 'Visita agendada', ordenarPor: '_proxima' },
+                  { chave: 'primeiro', rotulo: '1º agendamento', dica: 'motivoAg' },
+                  { chave: 'status', rotulo: 'Status' },
+                  // histórico do login (pedido de 30/10/2026): priorizar
+                  // atendimento de qualidade em quem já teve muito reparo
+                  // faixas exclusivas: cada reparo cai numa só (ver historicoDosLogins)
+                  ...(
+                    [
+                      ['p30', 'até 30 dias'],
+                      ['p60', 'de 31 a 60 dias'],
+                      ['p90', 'de 61 a 90 dias'],
+                    ] as const
+                  ).map(([k, faixa]) => ({
+                    chave: k,
+                    rotulo: k.toUpperCase(),
+                    alinhar: 'dir' as const,
+                    ordenarPor: `_${k}`,
+                    dicaCabecalho: `Outros reparos de campo do mesmo login (PPPoE) ${faixa} atrás, sem contar este e sem preventivas`,
+                  })),
+                  {
+                    chave: 'pt',
+                    rotulo: 'PT',
+                    alinhar: 'dir',
+                    ordenarPor: '_pt',
+                    dicaCabecalho:
+                      'Outros reparos de campo do mesmo login (PPPoE) em todo o histórico do ERP, sem contar este e sem preventivas',
+                  },
+                  { chave: 'cidade', rotulo: 'Cidade' },
+                  { chave: 'bairro', rotulo: 'Bairro' },
+                  { chave: 'base', rotulo: 'Base' },
+                ],
+                // clicar no cabeçalho ordena (pedido de 30/10/2026); as chaves
+                // com _ são os valores crus que a ordenação usa — Copiar e CSV
+                // levam só as colunas, então elas não vazam para o arquivo
+                ordenavel: true,
+                linhas: abertosTabela.map((a) => ({
+                  _criado: a.criado,
+                  _idade: a.idadeH,
+                  _risco: a.risco,
+                  _proxima: a.proxima ?? '',
+                  _p30: a.historico?.p30 ?? '',
+                  _p60: a.historico?.p60 ?? '',
+                  _p90: a.historico?.p90 ?? '',
+                  _pt: a.historico?.pt ?? '',
+                  protocolo: a.protocolo,
+                  aberto: diaHora(a.criado),
+                  idade: fmtHorasCurto(a.idadeH),
+                  chance: fmtFracaoPct(a.risco, 0),
+                  motivo:
+                    ROTULO_MOTIVO[a.motivo] +
+                    (a.motivo === 'agenda-tarde' && pedidoDoCliente(a) ? ' · pedido do cliente' : ''),
+                  // último agendamento; "(passou)" quando a visita já foi e o
+                  // protocolo segue aberto sem nova data
+                  agenda: a.proxima
+                    ? `${diaHora(a.proxima)}${a.proxima < qa.data!.meta.agora ? ' (passou)' : ''}`
+                    : '',
+                  primeiro:
+                    (a.primeiroAgendamento ? ROTULO_AGENDAMENTO[a.primeiroAgendamento] : '—') +
+                    (a.remarcacoes > 0 ? ` · remarcado ${a.remarcacoes}x` : ''),
+                  // motivo escrito do 1º agendamento: só no passar do mouse
+                  motivoAg: a.motivoAgendamento ?? '',
+                  // `?.`: o cache L2 (Redis) sobrevive ao redeploy e pode
+                  // entregar a lista de antes destas colunas — sem ele a tela
+                  // inteira quebrava (30/10/2026); vira "—" até revalidar
+                  p30: fmtInt(a.historico?.p30),
+                  p60: fmtInt(a.historico?.p60),
+                  p90: fmtInt(a.historico?.p90),
+                  pt: fmtInt(a.historico?.pt),
+                  status: a.status ?? '',
+                  cidade: a.cidade ?? '',
+                  bairro: a.bairro ?? '',
+                  base: a.base ? semEmoji(a.base).replace(' (Manutenção)', '') : '',
+                })),
+              }}
+            />
             <Painel
               titulo="Chance de passar de 48h pela idade"
               classe="v-cheia"
@@ -321,50 +468,19 @@ export function PredicoesConteudo() {
               }}
             >
               {d?.fechamento && (
-                <CurvaFechamento passa={d.fechamento.passa} idadesAbertos={abertos.map((a) => a.idadeH)} />
+                <CurvaFechamento
+                  passa={d.fechamento.passa}
+                  abertos={abertos.map((a) => ({
+                    protocolo: a.protocolo,
+                    idadeH: a.idadeH,
+                    risco: a.risco,
+                    agendaTarde: a.motivo === 'agenda-tarde',
+                  }))}
+                  horaSelecionada={horaSel}
+                  aoSelecionarHora={setHoraSel}
+                />
               )}
             </Painel>
-            <Painel
-              titulo="Reparos abertos agora"
-              classe="v-cheia"
-              soTabela
-              semQuebra
-              descricao={`Os que ainda dá para salvar primeiro, do mais arriscado ao menos.${
-                qa.data
-                  ? ` ${fmtInt(resumoAbertos.agendaTarde)} com horário reservado depois das 48h — esses só se salvam remarcando.`
-                  : ''
-              }`}
-              carregando={qa.isLoading || carregando}
-              erro={erroA ?? erroP}
-              textoVazio="Nenhum reparo aberto agora."
-              nota={qa.data ? <>Lista renovada a cada 10 min · leitura de {fmtDataHora(qa.data.meta.agora)}</> : undefined}
-              tabela={{
-                colunas: [
-                  { chave: 'protocolo', rotulo: 'Protocolo' },
-                  { chave: 'aberto', rotulo: 'Aberto em' },
-                  { chave: 'idade', rotulo: 'Idade', alinhar: 'dir' },
-                  { chave: 'chance', rotulo: 'Chance', alinhar: 'dir' },
-                  { chave: 'motivo', rotulo: 'Por quê' },
-                  { chave: 'agenda', rotulo: 'Próx. horário' },
-                  { chave: 'status', rotulo: 'Status' },
-                  { chave: 'cidade', rotulo: 'Cidade' },
-                  { chave: 'bairro', rotulo: 'Bairro' },
-                  { chave: 'base', rotulo: 'Base' },
-                ],
-                linhas: abertos.map((a) => ({
-                  protocolo: a.protocolo,
-                  aberto: diaHora(a.criado),
-                  idade: fmtHorasCurto(a.idadeH),
-                  chance: fmtFracaoPct(a.risco, 0),
-                  motivo: ROTULO_MOTIVO[a.motivo],
-                  agenda: a.proxima ? diaHora(a.proxima) : '',
-                  status: a.status ?? '',
-                  cidade: a.cidade ?? '',
-                  bairro: a.bairro ?? '',
-                  base: a.base ? semEmoji(a.base).replace(' (Manutenção)', '') : '',
-                })),
-              }}
-            />
           </section>
         )}
 
@@ -384,14 +500,19 @@ export function PredicoesConteudo() {
                   { chave: 'recente', rotulo: 'Últimas 4 sem.', alinhar: 'dir' },
                   { chave: 'esperado', rotulo: 'Esperado', alinhar: 'dir' },
                   { chave: 'razao', rotulo: 'Vezes o normal', alinhar: 'dir' },
-                  { chave: 'z', rotulo: 'z', alinhar: 'dir' },
+                  {
+                    chave: 'z',
+                    rotulo: 'z',
+                    alinhar: 'dir',
+                    dicaCabecalho: 'Quanto o bairro passou do normal dele: acima de 2, dificilmente é acaso; quanto maior, mais certeza.',
+                  },
                 ],
                 linhas: emAlta.map((b) => ({
                   bairro: b.bairro,
                   cidade: b.cidade,
                   recente: fmtInt(b.recente),
                   esperado: fmtDec(b.esperado),
-                  razao: `${fmtDec(b.razao)}×`,
+                  razao: fmtVezes(b.razao),
                   z: fmtDec(b.z),
                 })),
               }}
@@ -404,7 +525,7 @@ export function PredicoesConteudo() {
                     detalhe: `${fmtInt(b.recente)} reparos em 4 semanas; o normal seria ${fmtDec(b.esperado)}`,
                   }))}
                   unidade="vezes o normal"
-                  formatarValor={(x) => `${fmtDec(x)}×`}
+                  formatarValor={fmtVezes}
                 />
               )}
             </Painel>
@@ -590,7 +711,7 @@ const METODOS = [
   },
   {
     pergunta: 'Abertos que passam de 48h',
-    metodo: 'De quem estava aberto na mesma idade, quantos passaram de 48h; horário reservado depois das 48h conta como certo.',
+    metodo: 'De quem estava aberto na mesma idade, quantos passaram de 48h; visita agendada (o último agendamento) depois das 48h conta como certo.',
     dados: 'Reparos abertos nas últimas 12 semanas',
   },
   {

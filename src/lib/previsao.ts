@@ -435,8 +435,9 @@ export type MotivoRisco = 'estourou' | 'agenda-tarde' | 'curva'
  * O risco de um reparo aberto passar de 48h.
  *
  * - já passou: 100%, e o motivo diz isso;
- * - tem horário reservado DEPOIS das 48h: vai passar, salvo se resolverem
- *   remoto antes — a curva histórica não sabe disso, a agenda sabe;
+ * - a visita agendada (o último agendamento, reservado ou não) é DEPOIS das
+ *   48h: vai passar, salvo se anteciparem ou resolverem remoto — a curva
+ *   histórica não sabe disso, a agenda sabe;
  * - fora isso, a curva da coorte na idade dele.
  */
 export function riscoDoAberto(
@@ -448,6 +449,61 @@ export function riscoDoAberto(
   if (idadeH >= LIMITE_HORAS) return { risco: 1, motivo: 'estourou' }
   if (proxima && horasEntre(criado, proxima) >= LIMITE_HORAS) return { risco: 1, motivo: 'agenda-tarde' }
   return { risco: curva.passa[Math.max(0, Math.floor(idadeH))] ?? 0, motivo: 'curva' }
+}
+
+// ── O 1º agendamento foi a pedido do cliente? ──────────────────────────────
+
+export type ClasseAgendamento = 'pedido' | 'agenda'
+
+/**
+ * Texto de motivo utilizável, ou null. Corta o resto do modelo do relato que a
+ * extração da máscara às vezes arrasta ("· Número da CTO…", "=====") e trata
+ * como vazio o que não diz nada: "", ".", "...", "sim", "não".
+ */
+export function limparMotivo(bruto: string | null | undefined): string | null {
+  if (!bruto) return null
+  const s = bruto
+    .replace(/\(Detalhar[^)]*\)?/gi, ' ')
+    .replace(/_+/g, ' ')
+    .split(/[\n\r·]|N[úu]mero da CTO|={3,}/i)[0]!
+    .replace(/^[\s:.\-–]+/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const so = s.toLowerCase().replace(/[^a-zà-ú]/g, '')
+  if (['', 'sim', 's', 'nao', 'não', 'n', 'ok', 'x'].includes(so)) return null
+  return s
+}
+
+/**
+ * A classificação do 1º agendamento a partir das duas fontes do Voalle.
+ *
+ * O CHECKLIST VALE PRIMEIRO — é o modelo novo (outubro/2026), e o relato com a
+ * máscara "Motivo da Data" sai de uso. Mas o checklist ainda não pegou no
+ * time: em outubro as duas fontes discordaram em 16 a 21% por semana, e no
+ * maior grupo (checklist "Pedido do Cliente: Sim" × máscara "Conforme Agenda",
+ * 97 casos desde 19/10) o motivo escrito era "sim", "." ou vazio — marcação no
+ * automático. Quem atendeu pedido de fato escreve qual foi.
+ *
+ * Por isso: checklist SEM motivo de verdade que DISCORDA da máscara perde para
+ * ela. Sem checklist, vale a máscara (o caso da maioria dos abertos: o
+ * checklist é preenchido ao longo do atendimento, a máscara no agendamento).
+ * Quando a máscara for aposentada, a regra se reduz ao checklist sozinho.
+ * Decidido com a Manutenção em 29/10/2026.
+ */
+export function classificarAgendamento(f: {
+  chkPedido: string | null
+  chkMotivo: string | null
+  mascara: ClasseAgendamento | null
+  mascaraMotivo: string | null
+}): { classe: ClasseAgendamento | null; motivo: string | null } {
+  const chk: ClasseAgendamento | null =
+    f.chkPedido === '1' ? 'pedido' : f.chkPedido === '0' ? 'agenda' : null
+  const chkMotivo = limparMotivo(f.chkMotivo)
+  if (chk && (chkMotivo || !f.mascara || f.mascara === chk)) {
+    return { classe: chk, motivo: chkMotivo ?? limparMotivo(f.mascaraMotivo) }
+  }
+  if (f.mascara) return { classe: f.mascara, motivo: limparMotivo(f.mascaraMotivo) }
+  return { classe: null, motivo: null }
 }
 
 // ── Onde a rede pede socorro ───────────────────────────────────────────────

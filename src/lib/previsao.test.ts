@@ -4,7 +4,9 @@ import {
   avaliarPrevisao,
   bairrosEmAlta,
   caudaPoisson,
+  classificarAgendamento,
   curvaDeFechamento,
+  limparMotivo,
   diaDaSemana,
   faixaAtual,
   loginsCronicos,
@@ -265,5 +267,54 @@ describe('clientes', () => {
       ['b', 4, 2],
       ['a', 3, 21],
     ])
+  })
+})
+
+/**
+ * Os casos são protocolos reais de outubro/2026, conferidos com a Manutenção
+ * em 29/10 — cada um é um dos desenhos de divergência entre checklist e máscara.
+ */
+describe('1º agendamento: checklist primeiro, máscara quando o checklist não diz nada', () => {
+  it('limparMotivo: vazio, pontuação e "sim" não são motivo; o resto do relato é cortado', () => {
+    expect(limparMotivo('.')).toBeNull()
+    expect(limparMotivo('.,')).toBeNull()
+    expect(limparMotivo('...')).toBeNull()
+    expect(limparMotivo('sim')).toBeNull()
+    expect(limparMotivo('(Detalhar pedido do cliente) __________________ ')).toBeNull()
+    expect(limparMotivo(': só esta de noite · Número da CTO: SLE-C-1')).toBe('só esta de noite')
+    expect(limparMotivo('\n\n· Número da CTO: SLE-C-048-1-1-15/4\n=====')).toBeNull()
+  })
+
+  it('1857177: checklist com motivo escrito vence a máscara', () => {
+    const c = classificarAgendamento({
+      chkPedido: '1', chkMotivo: 'Cliente só pode no turno noite.',
+      mascara: 'agenda', mascaraMotivo: '(Detalhar pedido do cliente) ____',
+    })
+    expect(c).toEqual({ classe: 'pedido', motivo: 'Cliente só pode no turno noite.' })
+  })
+
+  it('1866234: checklist "Sim" sem motivo que discorda da máscara perde para ela', () => {
+    const c = classificarAgendamento({ chkPedido: '1', chkMotivo: '.', mascara: 'agenda', mascaraMotivo: null })
+    expect(c.classe).toBe('agenda')
+  })
+
+  it('1861419: checklist "Não" sem motivo × máscara com pedido detalhado — vale a máscara', () => {
+    const c = classificarAgendamento({
+      chkPedido: '0', chkMotivo: '.,',
+      mascara: 'pedido', mascaraMotivo: '(Detalhar pedido do cliente) _____cliente so esta em casa após as 19:00_____',
+    })
+    expect(c).toEqual({ classe: 'pedido', motivo: 'cliente so esta em casa após as 19:00' })
+  })
+
+  it('checklist sem motivo mas que CONCORDA com a máscara continua valendo', () => {
+    const c = classificarAgendamento({ chkPedido: '0', chkMotivo: '.', mascara: 'agenda', mascaraMotivo: null })
+    expect(c.classe).toBe('agenda')
+  })
+
+  it('sem checklist vale a máscara; sem nenhum dos dois, sem classificação', () => {
+    expect(classificarAgendamento({ chkPedido: null, chkMotivo: null, mascara: 'pedido', mascaraMotivo: ': não pode hoje' }))
+      .toEqual({ classe: 'pedido', motivo: 'não pode hoje' })
+    expect(classificarAgendamento({ chkPedido: null, chkMotivo: null, mascara: null, mascaraMotivo: null }))
+      .toEqual({ classe: null, motivo: null })
   })
 })

@@ -161,7 +161,8 @@ export function baseEixoValor(tk: TokensTema, extra?: Record<string, unknown>) {
  * ⚠️ NÃO USAR EM SÉRIE SOBREPOSTA. Com duas linhas no mesmo eixo o rótulo de
  * uma cai em cima da outra, e `hideOverlap` resolve a colisão escondendo um
  * dos dois — o gráfico passa a mostrar números que aparecem e somem conforme
- * o zoom. `SerieTemporal` rotula só o último ponto de cada série por isso.
+ * o zoom. (`SerieTemporal` era o exemplo disso até 19/10/2026; hoje é coluna
+ * + linha em eixos separados e rotula a coluna com 'insideTop'.)
  */
 export function rotuloValor({
   n,

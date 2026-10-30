@@ -7,6 +7,7 @@ import {
   LineChart,
   HeatmapChart,
   CustomChart,
+  ScatterChart,
 } from 'echarts/charts'
 import {
   GridComponent,
@@ -30,6 +31,9 @@ echarts.use([
   LineChart,
   HeatmapChart,
   CustomChart,
+  // os pontos clicáveis da curva de 48h (Predições). Série que não está aqui
+  // é IGNORADA em silêncio — sem erro, o gráfico só não a desenha
+  ScatterChart,
   GridComponent,
   TooltipComponent,
   LegendComponent,
@@ -61,8 +65,9 @@ export type ChartProps = {
   /**
    * Clique numa marca da série. Recebe o `dataIndex` — quem chama traduz para
    * o seu domínio, porque só ele sabe a ordem em que montou os dados.
+   * `seriesIndex` separa as séries quando há mais de uma clicável.
    */
-  aoClicar?: (dataIndex: number) => void
+  aoClicar?: (dataIndex: number, seriesIndex?: number) => void
 }
 
 export function Chart({
@@ -98,8 +103,8 @@ export function Chart({
     ro.observe(ref.current)
 
     chart.on('click', (p) => {
-      const i = (p as { dataIndex?: number }).dataIndex
-      if (typeof i === 'number') aoClicarRef.current?.(i)
+      const { dataIndex: i, seriesIndex } = p as { dataIndex?: number; seriesIndex?: number }
+      if (typeof i === 'number') aoClicarRef.current?.(i, seriesIndex)
     })
 
     return () => {

@@ -51,9 +51,17 @@ export function ProdutividadeConteudo() {
     : undefined
 
   /**
-   * Técnicos com pouquíssima visita distorcem qualquer ranking de taxa: quem fez
+   * Técnicos com pouquíssima visita distorcem qualquer ranking de TAXA: quem fez
    * 1 visita e acertou aparece com 100%. O corte é declarado na tela, não
    * escondido — ver o rodapé do painel.
+   *
+   * ⚠️ SÓ NO GRÁFICO E SÓ ORDENANDO POR ASSERTIVIDADE (30/10/2026). Era a
+   * decisão original (docs/04 item 8, 10/08: "o gráfico oculta, a tabela
+   * mostra todos"), mas em 09/09 o corte passou a valer para a tabela também,
+   * sem registro — e com um dia só no filtro ninguém chega a 10 atividades
+   * (~5 por técnico por dia), então o painel inteiro ficava vazio. Ordenar por
+   * produção ou por visitas perdidas é ordenar por CONTAGEM, que amostra
+   * pequena não distorce: quem fez pouco só fica embaixo.
    */
   const MIN_VISITAS = 10
 
@@ -64,7 +72,6 @@ export function ProdutividadeConteudo() {
    */
   const tecnicos = useMemo(() => {
     const lista = (d?.porTecnico ?? [])
-      .filter((x) => x.totalVisitas >= MIN_VISITAS)
       .map((x) => {
         const abonado = [...abonados].reduce(
           (soma, g) => soma + (x.improdutivoPorGrupo[g] ?? 0),
@@ -74,6 +81,8 @@ export function ProdutividadeConteudo() {
         const reais = x.produtivo + improdutivo
         return {
           ...x,
+          // medido ANTES do abono: abonar não pode tirar ninguém do gráfico
+          amostraPequena: x.totalVisitas < MIN_VISITAS,
           improdutivo,
           abonado,
           totalVisitas: x.produtivo + improdutivo + x.semAcao,
@@ -98,13 +107,20 @@ export function ProdutividadeConteudo() {
    * gestor ver o time todo, inclusive quem está fora do gráfico, sem precisar
    * de outra tela. Ver a pergunta que motivou isso em docs/06.
    */
-  const tecnicosGrafico = useMemo(() => tecnicos.slice(0, 15), [tecnicos])
+  const cortaAmostra = ordem === 'assertividade'
+  const comAmostra = useMemo(() => tecnicos.filter((x) => !x.amostraPequena), [tecnicos])
+  /** o corte esconderia TODO MUNDO (um dia só no filtro): mostra todos, com aviso */
+  const semAmostra = cortaAmostra && tecnicos.length > 0 && comAmostra.length === 0
+  const tecnicosGrafico = useMemo(
+    () => (cortaAmostra && !semAmostra ? comAmostra : tecnicos).slice(0, 15),
+    [cortaAmostra, semAmostra, comAmostra, tecnicos]
+  )
 
   const totalAbonado = tecnicos.reduce((s, x) => s + x.abonado, 0)
 
-  const tecnicosOcultos = (d?.porTecnico ?? []).filter(
-    (x) => x.totalVisitas < MIN_VISITAS
-  ).length
+  /** fora do GRÁFICO pelo corte de amostra — a tabela sempre tem todos */
+  const tecnicosOcultos = cortaAmostra && !semAmostra ? tecnicos.length - comAmostra.length : 0
+  const baseGrafico = cortaAmostra && !semAmostra ? comAmostra.length : tecnicos.length
 
   /**
    * Catálogos residuais (1–2 visitas por engano de classificação) entram no
@@ -329,8 +345,10 @@ export function ProdutividadeConteudo() {
         nota={
           <>
             {tecnicosOcultos > 0 &&
-              `${tecnicosOcultos} técnico(s) com menos de ${MIN_VISITAS} atividades fora de tudo (gráfico e tabela) — em amostra pequena a taxa não é comparável. `}
-            {tecnicos.length > tecnicosGrafico.length &&
+              `${tecnicosOcultos} técnico(s) com menos de ${MIN_VISITAS} atividades fora do gráfico nesta ordenação — em amostra pequena a taxa não é comparável. A tabela mostra todos. `}
+            {semAmostra &&
+              `Nenhum técnico chegou a ${MIN_VISITAS} atividades no período: o gráfico mostra todos, mas com tão poucas visitas a assertividade de um não é comparável com a de outro. `}
+            {baseGrafico > tecnicosGrafico.length &&
               `Gráfico mostra os ${tecnicosGrafico.length} primeiros; a tabela tem os ${tecnicos.length} técnicos do recorte — use “inverter” para trazer os piores para o topo. `}
             {abonados.size > 0
               ? `Abonando ${[...abonados].join(', ')}: ${fmtInt(totalAbonado)} improdutivas saíram da conta do técnico. O total da operação não muda.`

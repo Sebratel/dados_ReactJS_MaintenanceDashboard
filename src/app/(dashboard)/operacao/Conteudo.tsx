@@ -31,7 +31,9 @@ export function OperacaoConteudo() {
       <Painel
         titulo="Entrantes e saldo do backlog"
         classe="v-grafico"
-        descricao={`Barra = entrantes. Linha = saldo (entra − sai): acima da tracejada o backlog cresceu. Encerrados fica no tooltip e na aba Tabela. Eixo da data: ${filtros.eixo}`}
+        // "reparo e preventiva": o Histórico conta só reparo, e o 90 daqui contra
+        // o 72 de lá (out/2026, Cancelado) virou pergunta em 23/10/2026
+        descricao={`Barra = entrantes, reparo e preventiva. Linha = saldo (entra − sai): acima da tracejada o backlog cresceu. Encerrados fica no tooltip e na aba Tabela. Eixo da data: ${filtros.eixo}`}
         carregando={serie.isLoading}
         erro={serie.error ? String(serie.error.message) : null}
         tabela={{

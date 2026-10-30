@@ -7,7 +7,37 @@ import { ExplicarIA } from './ExplicarIA'
 import { Icone } from './Icone'
 import { Segmentado } from './Segmentado'
 
-export type ColunaTabela = { chave: string; rotulo: string; alinhar?: 'esq' | 'dir' }
+export type ColunaTabela = {
+  chave: string
+  rotulo: string
+  alinhar?: 'esq' | 'dir'
+  /**
+   * Chave da linha cujo texto vira a dica (title) da célula — para detalhe
+   * que não cabe numa coluna, como o motivo escrito de um agendamento.
+   */
+  dica?: string
+  /** dica (title) do cabeçalho — o que a sigla da coluna quer dizer */
+  dicaCabecalho?: string
+  /**
+   * Chave da linha com o valor CRU para ordenar, quando a célula é texto
+   * formatado: "100%" < "90%" e "45h" < "5h" como texto. Sem ela, ordena
+   * pela própria célula (número como número, texto como texto).
+   */
+  ordenarPor?: string
+}
+
+type Ordem = { chave: string; desc: boolean }
+
+/** vazio e "—" vão para o fim nos dois sentidos: ausência não é valor */
+function compararCelula(a: string | number | undefined, b: string | number | undefined, desc: boolean): number {
+  const vazio = (v: unknown) => v === undefined || v === null || v === '' || v === '—'
+  if (vazio(a) || vazio(b)) return vazio(a) === vazio(b) ? 0 : vazio(a) ? 1 : -1
+  const r =
+    typeof a === 'number' && typeof b === 'number'
+      ? a - b
+      : String(a).localeCompare(String(b), 'pt-BR', { numeric: true, sensitivity: 'base' })
+  return desc ? -r : r
+}
 
 /**
  * A altura do card, em fração da área útil da tela (padrao.css). É o que faz
@@ -32,7 +62,16 @@ export type PainelProps = {
    * Além de acessibilidade, é o "canal de alívio" que deixa conferir o número
    * por trás de cada barra, e é ela que vai para o Copiar, o CSV e a IA.
    */
-  tabela?: { colunas: ColunaTabela[]; linhas: Record<string, string | number>[] }
+  tabela?: {
+    colunas: ColunaTabela[]
+    linhas: Record<string, string | number>[]
+    /**
+     * Clicar no cabeçalho ordena; o segundo clique inverte, o terceiro volta à
+     * ordem de quem montou a tabela. Opt-in: a maioria das tabelas é a visão
+     * de um gráfico e tem ordem que significa algo (período, ranking).
+     */
+    ordenavel?: boolean
+  }
   acoes?: ReactNode
   /** posição no grid da página (ex.: ocupar duas colunas) — não mexe em altura */
   className?: string
@@ -101,16 +140,28 @@ export function Painel({
 
   const aoCopiar = async () => {
     if (!tabela) return
-    const ok = await copiar(paraTsv(tabela.colunas, tabela.linhas))
+    const ok = await copiar(paraTsv(tabela.colunas, linhasVisiveis))
     setCopia(ok ? 'ok' : 'erro')
   }
 
   const aoBaixar = () => {
     if (!tabela) return
-    baixarCsv(nomeDeArquivo(titulo), paraCsv(tabela.colunas, tabela.linhas))
+    baixarCsv(nomeDeArquivo(titulo), paraCsv(tabela.colunas, linhasVisiveis))
   }
 
   const semDados = vazio ?? (tabela !== undefined && tabela.linhas.length === 0)
+
+  const [ordem, setOrdem] = useState<Ordem | null>(null)
+  const colunaOrdem = ordem && tabela?.ordenavel ? tabela.colunas.find((c) => c.chave === ordem.chave) : undefined
+  const linhasVisiveis =
+    tabela && ordem && colunaOrdem
+      ? [...tabela.linhas].sort((x, y) => {
+          const k = colunaOrdem.ordenarPor ?? colunaOrdem.chave
+          return compararCelula(x[k], y[k], ordem.desc)
+        })
+      : (tabela?.linhas ?? [])
+  const alternarOrdem = (chave: string) =>
+    setOrdem((o) => (!o || o.chave !== chave ? { chave, desc: false } : !o.desc ? { chave, desc: true } : null))
 
   return (
     <section className={`visual ${classe} ${className}`} aria-label={titulo}>
@@ -209,21 +260,36 @@ export function Painel({
               <thead>
                 <tr>
                   {tabela.colunas.map((c) => (
-                    <th key={c.chave} scope="col" className={c.alinhar === 'dir' ? '' : 'texto'}>
+                    <th
+                      key={c.chave}
+                      scope="col"
+                      className={c.alinhar === 'dir' ? '' : 'texto'}
+                      title={c.dicaCabecalho}
+                      aria-sort={
+                        ordem?.chave === c.chave ? (ordem.desc ? 'descending' : 'ascending') : undefined
+                      }
+                      onClick={tabela.ordenavel ? () => alternarOrdem(c.chave) : undefined}
+                      style={tabela.ordenavel ? { cursor: 'pointer', userSelect: 'none' } : undefined}
+                    >
                       {c.rotulo}
+                      {ordem?.chave === c.chave && (ordem.desc ? ' ▼' : ' ▲')}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {tabela.linhas.map((l, i) => (
+                {linhasVisiveis.map((l, i) => (
                   <tr key={i}>
                     {tabela.colunas.map((c) => {
                       const v = l[c.chave]
                       // emoji do banco (o ✅ das bases) sai só da TELA: Copiar e
                       // CSV levam o valor cru, que é o que bate com o Voalle
                       return (
-                        <td key={c.chave} className={c.alinhar === 'dir' ? '' : 'texto'}>
+                        <td
+                          key={c.chave}
+                          className={c.alinhar === 'dir' ? '' : 'texto'}
+                          title={c.dica && l[c.dica] ? String(l[c.dica]) : undefined}
+                        >
                           {v === undefined || v === null ? '—' : typeof v === 'string' ? semEmoji(v) : v}
                         </td>
                       )
