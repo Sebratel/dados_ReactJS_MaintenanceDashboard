@@ -102,7 +102,10 @@ export function RankingSimples({
 
     return {
       grid: baseGrid(tk, {
-        left: 8,
+        // 20 e não 8: o `containLabel` mede o rótulo mais longo alguns px a
+        // menos e comia a 1ª letra dele ("rroio da Manteiga", Predições,
+        // 30/10/2026). A folga não muda nada nos rótulos curtos.
+        left: 20,
         right: 52,
         top: 4,
         bottom: 4,

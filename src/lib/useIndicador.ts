@@ -224,6 +224,9 @@ export type MetaProtocolos = {
   truncado: boolean
   limite: number
   excluidosTeste: number
+  /** ver ResultadoProtocolos em server/indicadores/protocolos.ts */
+  loginsDistintos?: number
+  retornoPorFaixa?: { sim: number; v30: number; v60: number; v90: number; nao: number }
   pagina: number
   porPagina: number
   paginas: number

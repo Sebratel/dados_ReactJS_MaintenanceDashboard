@@ -10,6 +10,7 @@ import {
   baseGrid,
   baseTooltip,
   gradienteColuna,
+  rotuloValor,
 } from '@/lib/tema'
 import { fmtDiaSemana, fmtInt } from '@/lib/formato'
 import type { DiaPlano } from '@/lib/previsao'
@@ -70,13 +71,32 @@ export function PlanoCampo({ plano }: { plano: DiaPlano[] }) {
           data: plano.map((d) => d.capacidade),
           barMaxWidth: 26,
           itemStyle: { color: gradienteColuna(tk), borderRadius: MARCA.barraTopo4px },
+          // ACIMA da coluna: no fim de semana a demanda encosta no ritmo, e um
+          // rótulo 'insideTop' ficaria em cima do ponto da linha
+          ...rotuloValor({
+            n: plano.length,
+            formatter: (p) => (p.value === null ? '' : fmtInt(p.value)),
+            cor: tk.textPrimary,
+          }),
         },
         {
           name: 'Visitas de reparo previstas',
           type: 'line',
           // a cor da SÉRIE é o que a legenda pinta; a do ponto vem por função
           color: tk.series[2],
-          data: plano.map((d) => d.demanda),
+          /*
+           * O número da demanda vai ABAIXO do ponto: o da coluna está acima da
+           * coluna, e o ponto separa os dois. Onde falta visita o ponto sobe
+           * acima da coluna — ali o rótulo vai por cima, junto com o "falta".
+           */
+          data: plano.map((d) =>
+            d.folga < 0
+              ? {
+                  value: d.demanda,
+                  label: { position: 'top', formatter: `${fmtInt(d.demanda)} · falta ${fmtInt(-d.folga)}` },
+                }
+              : { value: d.demanda, label: { position: 'bottom', formatter: fmtInt(d.demanda) } }
+          ),
           symbol: 'circle',
           symbolSize: MARCA.tamanhoMarcador,
           lineStyle: { width: MARCA.larguraLinha, color: tk.series[2] },
@@ -86,16 +106,7 @@ export function PlanoCampo({ plano }: { plano: DiaPlano[] }) {
             borderColor: tk.surface,
             borderWidth: 2,
           },
-          label: {
-            show: true,
-            position: 'top',
-            fontSize: 10,
-            color: tk.textSecondary,
-            formatter: (p: { dataIndex: number }) => {
-              const f = plano[p.dataIndex]?.folga ?? 0
-              return f < 0 ? `falta ${fmtInt(-f)}` : ''
-            },
-          },
+          label: { show: true, fontSize: 11, fontWeight: 600, color: tk.textPrimary },
           labelLayout: { hideOverlap: true },
         },
       ],

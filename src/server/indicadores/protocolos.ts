@@ -174,6 +174,19 @@ export type ResultadoProtocolos = {
     limite: number
     /** protocolos do cliente de teste removidos deste recorte */
     excluidosTeste: number
+    /**
+     * Logins PPPoE distintos no recorte — o card da tela mostra ao lado do
+     * total de protocolos para que "protocolo ≠ login" fique à vista (a dúvida
+     * 118 × 105 contra a Recorrência, 23/10/2026). Opcional: entrada de cache
+     * anterior a 30/10/2026 não tem.
+     */
+    loginsDistintos?: number
+    /**
+     * Quantos protocolos da lista caem em cada botão de "Retorno do reparo",
+     * contados do MESMO mapa que o filtro usa — a contagem do botão é o que o
+     * clique devolve. Só reparo do universo do retorno entra; preventiva não.
+     */
+    retornoPorFaixa?: { sim: number; v30: number; v60: number; v90: number; nao: number }
   }
   ms: number
 }
@@ -579,9 +592,30 @@ export async function obterProtocolos(f: Filtros): Promise<ResultadoProtocolos> 
   // regra funcionando.
   const excluidosTeste = await contarExcluidosTeste(f)
 
+  const loginsDistintos = new Set(linhas.map((l) => l.instalacao).filter(Boolean)).size
+  const retornoPorFaixa = { sim: 0, v30: 0, v60: 0, v90: 0, nao: 0 }
+  for (const l of linhas) {
+    const v = retorno.get(Number(l.protocolo))
+    if (!v) continue // fora do universo do retorno (preventiva, cancelado…)
+    if (v.faixa === null) retornoPorFaixa.nao++
+    else {
+      retornoPorFaixa.sim++
+      if (v.faixa === '≤30d') retornoPorFaixa.v30++
+      else if (v.faixa === '31–60d') retornoPorFaixa.v60++
+      else retornoPorFaixa.v90++
+    }
+  }
+
   return {
     data: { linhas },
-    meta: { total: linhas.length, truncado, limite: LIMITE_LINHAS, excluidosTeste },
+    meta: {
+      total: linhas.length,
+      truncado,
+      limite: LIMITE_LINHAS,
+      excluidosTeste,
+      loginsDistintos,
+      retornoPorFaixa,
+    },
     ms,
   }
 }

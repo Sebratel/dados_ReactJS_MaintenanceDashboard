@@ -132,38 +132,29 @@ export function ProtocolosConteudo() {
         divergência de fato aparece.
       </p>
 
+      {/*
+        UM CARD SÓ (30/10/2026). "Linhas exibidas", "Páginas" e "Tempo da
+        consulta" eram cards e são números do SISTEMA, não da operação — foram
+        para o rodapé da tabela. Esta é a lista de conferência, não um painel de
+        indicador: novo card só se alguém pedir. Os logins distintos ficam no
+        subtítulo para "protocolo ≠ login" estar à vista.
+      */}
       <Kpis rotulo="Resumo do recorte">
-        <StatTile
-          rotulo="Protocolos no recorte"
-          valor={q.isLoading ? '…' : fmtInt(meta?.totalRecorte)}
-          contexto={
-            meta && meta.excluidosTeste > 0
-              ? `+${fmtInt(meta.excluidosTeste)} do cliente de teste, excluídos`
-              : 'cliente de teste já excluído'
-          }
-          destaque
-        />
-        <StatTile
-          rotulo="Linhas exibidas"
-          valor={q.isLoading ? '…' : fmtInt(meta?.total)}
-          contexto={busca ? `filtradas por “${busca}”` : 'sem busca aplicada'}
-        />
-        <StatTile
-          rotulo="Páginas"
-          valor={q.isLoading ? '…' : fmtInt(meta?.paginas)}
-          contexto={`${POR_PAGINA} linhas por página`}
-        />
-        <StatTile
-          rotulo="Tempo da consulta"
-          valor={q.isLoading || !meta ? '…' : `${(meta.ms / 1000).toFixed(1)} s`}
-          contexto={
-            meta?.cache === 'hit'
-              ? 'servido do cache do servidor'
-              : meta?.cache === 'stale'
-                ? 'cache vencido, atualizando atrás'
-                : 'consultado no ERP agora'
-          }
-        />
+        <div style={{ maxWidth: 380 }}>
+          <StatTile
+            rotulo="Protocolos no recorte"
+            valor={q.isLoading ? '…' : fmtInt(meta?.totalRecorte)}
+            contexto={[
+              meta?.loginsDistintos !== undefined ? `${fmtInt(meta.loginsDistintos)} logins (PPPoE)` : null,
+              meta && meta.excluidosTeste > 0
+                ? `+${fmtInt(meta.excluidosTeste)} do cliente de teste, excluídos`
+                : 'cliente de teste já excluído',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+            destaque
+          />
+        </div>
       </Kpis>
 
       {/* OS DOIS CORTES DE RECORRENCIA.
@@ -185,7 +176,18 @@ export function ProtocolosConteudo() {
           opcoes={RETORNO}
           valor={filtros.retorno ?? undefined}
           onChange={(id) => aplicarCorte('retorno', id)}
-          nota={filtros.retorno ? 'só protocolos de reparo entram neste corte' : null}
+          contagens={meta?.retornoPorFaixa ?? null}
+          /*
+            PROTOCOLO, NÃO LOGIN. Em 23/10/2026 o ≤30d daqui (118) foi comparado
+            com os "logins com retorno" da Recorrência (105) e pareceu
+            divergência: lá cada login conta uma vez por mês, aqui cada
+            protocolo conta. A nota diz isso e aponta onde está a outra régua.
+          */
+          nota={
+            filtros.retorno
+              ? 'só protocolos de reparo entram neste corte, e a contagem é por protocolo, não por login (PPPoE): o mesmo login pode aparecer mais de uma vez. Para ver quantos logins voltaram, use a aba Recorrência.'
+              : null
+          }
         />
       </div>
 
@@ -296,6 +298,19 @@ export function ProtocolosConteudo() {
               {fmtInt(inicio)}–{fmtInt(fim)} de {fmtInt(meta.total)}
             </span>
           )}
+          {/* os números de sistema que eram cards (até 30/10/2026) */}
+          {meta && (
+            <span className="tabular-nums text-[var(--text-muted)]">
+              {fmtInt(meta.total)} linhas{busca ? ` (busca “${busca}”)` : ''} · {fmtInt(meta.paginas)}{' '}
+              {meta.paginas === 1 ? 'página' : 'páginas'} de {POR_PAGINA} · consulta em{' '}
+              {(meta.ms / 1000).toFixed(1).replace('.', ',')} s ·{' '}
+              {meta.cache === 'hit'
+                ? 'do cache do servidor'
+                : meta.cache === 'stale'
+                  ? 'cache vencido, atualizando'
+                  : 'consultado no ERP agora'}
+            </span>
+          )}
           <div className="flex items-center gap-1">
             <button
               type="button"
@@ -367,6 +382,7 @@ function CorteRecorrencia({
   valor,
   onChange,
   nota,
+  contagens,
 }: {
   rotulo: string
   aria: string
@@ -374,7 +390,14 @@ function CorteRecorrencia({
   valor: string | undefined
   onChange: (id: string | undefined) => void
   nota: string | null
+  /**
+   * Quantos protocolos cada botão devolveria, por id. Só aparece com o corte em
+   * "Todos": com uma faixa escolhida a lista já está recortada, e as outras
+   * faixas mostrariam 0 — que leria como "não existe", e não é.
+   */
+  contagens?: Record<string, number> | null
 }) {
+  const mostrarContagem = valor === undefined && !!contagens
   return (
     <div className="flex flex-wrap items-center gap-2" role="group" aria-label={aria}>
       <span className="text-[var(--text-muted)]">{rotulo}</span>
@@ -389,6 +412,11 @@ function CorteRecorrencia({
             title={o.ajuda}
           >
             {o.rotulo}
+            {mostrarContagem && o.id && contagens![o.id] !== undefined && (
+              <span className="tabular-nums" style={{ opacity: 0.7 }}>
+                {' '}({fmtInt(contagens![o.id])})
+              </span>
+            )}
           </button>
         ))}
       </div>

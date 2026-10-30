@@ -10,6 +10,7 @@ import {
   baseGrid,
   baseTooltip,
   gradienteColuna,
+  rotuloValor,
 } from '@/lib/tema'
 import { fmtDiaSemana, fmtInt } from '@/lib/formato'
 import type { PontoPrevisao } from '@/lib/previsao'
@@ -113,6 +114,12 @@ export function PrevisaoDiaria({
           barMaxWidth: 22,
           barGap: '-100%',
           itemStyle: { color: gradienteColuna(tk), borderRadius: MARCA.barraTopo4px },
+          ...rotuloValor({
+            n: dias.length,
+            formatter: (p) => (p.value === null ? '' : fmtInt(p.value)),
+            cor: tk.textPrimary,
+            position: 'insideTop',
+          }),
           markLine: {
             silent: true,
             symbol: 'none',
@@ -134,6 +141,18 @@ export function PrevisaoDiaria({
             borderWidth: 1,
             borderRadius: MARCA.barraTopo4px,
           },
+          // NO MEIO da coluna, não no topo: o bigode da faixa sobe do mínimo
+          // (~3/4 do previsto) e cruzaria um rótulo 'insideTop'. A metade da
+          // coluna fica sempre abaixo do mínimo da faixa.
+          // COR APAGADA, e não a preta do realizado: pedido da Manutenção em
+          // 29/10/2026 — número que ainda não aconteceu não pode ter o mesmo
+          // peso de número que aconteceu, igual à coluna clara.
+          ...rotuloValor({
+            n: dias.length,
+            formatter: (p) => (p.value === null ? '' : fmtInt(p.value)),
+            cor: tk.textMuted,
+            position: 'inside',
+          }),
         },
         {
           name: 'Faixa provável (8 em 10 dias)',
